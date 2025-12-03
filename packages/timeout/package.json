@@ -1,0 +1,59 @@
+{
+  "name": "@fortify-ts/timeout",
+  "version": "0.1.0",
+  "description": "Timeout pattern for Fortify TS resilience library",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "dev": "tsup --watch",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fortify-ts/core": "workspace:*",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "tsup": "^8.3.5",
+    "vitest": "^2.1.8"
+  },
+  "peerDependencies": {
+    "zod": "^3.24.0"
+  },
+  "keywords": [
+    "resilience",
+    "fault-tolerance",
+    "timeout",
+    "typescript"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/felixgeelhaar/fortify-ts.git",
+    "directory": "packages/timeout"
+  },
+  "sideEffects": false
+}

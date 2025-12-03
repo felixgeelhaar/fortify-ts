@@ -1,0 +1,37 @@
+{
+  "name": "fortify-ts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Production-grade resilience and fault-tolerance library for TypeScript",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/felixgeelhaar/fortify-ts.git"
+  },
+  "license": "MIT",
+  "author": "Felix Geelhaar",
+  "type": "module",
+  "scripts": {
+    "build": "turbo build",
+    "clean": "turbo clean && rm -rf node_modules",
+    "dev": "turbo dev",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "test:coverage": "turbo test:coverage",
+    "typecheck": "turbo typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "eslint": "^9.16.0",
+    "prettier": "^3.4.2",
+    "tsup": "^8.3.5",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.17.0",
+    "vitest": "^2.1.8"
+  },
+  "packageManager": "pnpm@9.14.4",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
