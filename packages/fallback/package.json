@@ -1,6 +1,6 @@
 {
   "name": "@fortify-ts/fallback",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Fallback pattern for graceful degradation in @fortify-ts",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -32,6 +32,11 @@
   },
   "devDependencies": {
     "typescript": "^5.9.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/felixgeelhaar/fortify-ts.git",
+    "directory": "packages/fallback"
   },
   "keywords": [
     "fallback",

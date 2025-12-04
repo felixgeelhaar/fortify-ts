@@ -1,6 +1,6 @@
 {
   "name": "@fortify-ts/middleware",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Middleware composition chain for @fortify-ts resilience patterns",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -38,6 +38,11 @@
   },
   "devDependencies": {
     "typescript": "^5.9.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/felixgeelhaar/fortify-ts.git",
+    "directory": "packages/middleware"
   },
   "keywords": [
     "middleware",

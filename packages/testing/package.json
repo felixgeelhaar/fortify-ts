@@ -1,6 +1,6 @@
 {
   "name": "@fortify-ts/testing",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Chaos engineering testing utilities for fortify-ts resilience patterns",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -35,6 +35,11 @@
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.15"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/felixgeelhaar/fortify-ts.git",
+    "directory": "packages/testing"
   },
   "keywords": [
     "resilience",

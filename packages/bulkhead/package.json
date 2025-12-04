@@ -1,6 +1,6 @@
 {
   "name": "@fortify-ts/bulkhead",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Concurrency limiter bulkhead pattern for @fortify-ts",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -36,6 +36,11 @@
   },
   "peerDependencies": {
     "zod": "^3.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/felixgeelhaar/fortify-ts.git",
+    "directory": "packages/bulkhead"
   },
   "keywords": [
     "bulkhead",
