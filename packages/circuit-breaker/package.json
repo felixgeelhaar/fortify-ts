@@ -1,6 +1,6 @@
 {
   "name": "@fortify-ts/circuit-breaker",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Circuit breaker pattern for Fortify TS resilience library",
   "type": "module",
   "main": "./dist/index.cjs",
