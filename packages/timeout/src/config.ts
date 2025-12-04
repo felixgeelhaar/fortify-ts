@@ -8,7 +8,7 @@ export const timeoutConfigSchema = z.object({
   /** Default timeout in milliseconds (default: 30000) */
   defaultTimeout: z.number().int().positive().default(30000),
   /** Callback when timeout occurs */
-  onTimeout: z.function().returns(z.void()).optional(),
+  onTimeout: z.function().optional(),
 });
 
 /**

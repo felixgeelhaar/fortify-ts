@@ -1,14 +1,20 @@
 import { z } from 'zod';
 
 /**
+ * Schema for a function type (Zod 4 compatible).
+ * Uses z.function() which validates that the value is a function.
+ */
+const functionSchema = z.function();
+
+/**
  * Base schema for logger configuration.
  * Validates that the logger has the required methods.
  */
 export const loggerSchema = z.object({
-  debug: z.function().args(z.string(), z.record(z.unknown()).optional()).returns(z.void()),
-  info: z.function().args(z.string(), z.record(z.unknown()).optional()).returns(z.void()),
-  warn: z.function().args(z.string(), z.record(z.unknown()).optional()).returns(z.void()),
-  error: z.function().args(z.string(), z.record(z.unknown()).optional()).returns(z.void()),
+  debug: functionSchema,
+  info: functionSchema,
+  warn: functionSchema,
+  error: functionSchema,
 }).optional();
 
 /**
@@ -18,7 +24,7 @@ export const timeoutConfigSchema = z.object({
   /** Default timeout in milliseconds (default: 30000) */
   defaultTimeout: z.number().int().positive().default(30000),
   /** Callback when timeout occurs */
-  onTimeout: z.function().returns(z.void()).optional(),
+  onTimeout: functionSchema.optional(),
   /** Logger instance */
   logger: loggerSchema,
 });
@@ -49,9 +55,9 @@ export const retryConfigSchema = z.object({
   /** Add random jitter to delays (default: false) */
   jitter: z.boolean().default(false),
   /** Custom function to determine if error is retryable */
-  isRetryable: z.function().args(z.instanceof(Error)).returns(z.boolean()).optional(),
+  isRetryable: functionSchema.optional(),
   /** Callback on each retry attempt */
-  onRetry: z.function().args(z.number(), z.instanceof(Error)).returns(z.void()).optional(),
+  onRetry: functionSchema.optional(),
   /** Logger instance */
   logger: loggerSchema,
 });
@@ -91,20 +97,11 @@ export const circuitBreakerConfigSchema = z.object({
   /** Period to clear counts when closed, 0 means never (default: 0) */
   interval: z.number().int().nonnegative().default(0),
   /** Custom function to determine when to trip the breaker */
-  readyToTrip: z.function()
-    .args(circuitBreakerCountsSchema)
-    .returns(z.boolean())
-    .optional(),
+  readyToTrip: functionSchema.optional(),
   /** Custom function to determine if result is successful */
-  isSuccessful: z.function()
-    .args(z.instanceof(Error).nullable())
-    .returns(z.boolean())
-    .optional(),
+  isSuccessful: functionSchema.optional(),
   /** Callback on state change */
-  onStateChange: z.function()
-    .args(circuitBreakerStateSchema, circuitBreakerStateSchema)
-    .returns(z.void())
-    .optional(),
+  onStateChange: functionSchema.optional(),
   /** Logger instance */
   logger: loggerSchema,
 });
@@ -122,7 +119,7 @@ export const rateLimitConfigSchema = z.object({
   /** Interval for token refill in milliseconds (default: 1000) */
   interval: z.number().int().positive().default(1000),
   /** Callback when rate limit is hit */
-  onLimit: z.function().args(z.string()).returns(z.void()).optional(),
+  onLimit: functionSchema.optional(),
   /** Logger instance */
   logger: loggerSchema,
 });
@@ -140,7 +137,7 @@ export const bulkheadConfigSchema = z.object({
   /** Maximum time to wait in queue in milliseconds */
   queueTimeout: z.number().int().positive().optional(),
   /** Callback when request is rejected */
-  onRejected: z.function().returns(z.void()).optional(),
+  onRejected: functionSchema.optional(),
   /** Logger instance */
   logger: loggerSchema,
 });
@@ -152,21 +149,13 @@ export type BulkheadConfig = z.infer<typeof bulkheadConfigSchema>;
  */
 export const fallbackConfigSchema = z.object({
   /** Fallback function to execute when primary fails */
-  fallback: z.function()
-    .args(z.instanceof(Error))
-    .returns(z.promise(z.any()).or(z.any())),
+  fallback: functionSchema,
   /** Custom function to determine if fallback should be used */
-  shouldFallback: z.function()
-    .args(z.instanceof(Error))
-    .returns(z.boolean())
-    .optional(),
+  shouldFallback: functionSchema.optional(),
   /** Callback when fallback is triggered */
-  onFallback: z.function()
-    .args(z.instanceof(Error))
-    .returns(z.void())
-    .optional(),
+  onFallback: functionSchema.optional(),
   /** Callback when primary succeeds */
-  onSuccess: z.function().returns(z.void()).optional(),
+  onSuccess: functionSchema.optional(),
   /** Logger instance */
   logger: loggerSchema,
 });

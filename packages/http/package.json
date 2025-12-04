@@ -29,19 +29,19 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@fortify-ts/core": "workspace:*",
-    "@fortify-ts/circuit-breaker": "workspace:*",
-    "@fortify-ts/retry": "workspace:*",
-    "@fortify-ts/rate-limit": "workspace:*",
-    "@fortify-ts/timeout": "workspace:*",
     "@fortify-ts/bulkhead": "workspace:*",
+    "@fortify-ts/circuit-breaker": "workspace:*",
+    "@fortify-ts/core": "workspace:*",
     "@fortify-ts/fallback": "workspace:*",
-    "@fortify-ts/middleware": "workspace:*"
+    "@fortify-ts/middleware": "workspace:*",
+    "@fortify-ts/rate-limit": "workspace:*",
+    "@fortify-ts/retry": "workspace:*",
+    "@fortify-ts/timeout": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
-    "tsup": "^8.0.1",
-    "vitest": "^1.2.0"
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.15"
   },
   "keywords": [
     "resilience",

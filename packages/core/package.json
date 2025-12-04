@@ -32,12 +32,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "zod": "^3.24.4"
+    "zod": "^4.1.13"
   },
   "devDependencies": {
-    "typescript": "^5.7.2",
-    "tsup": "^8.3.5",
-    "vitest": "^2.1.8"
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.15"
   },
   "peerDependencies": {
     "zod": "^3.24.0"
