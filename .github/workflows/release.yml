@@ -38,10 +38,11 @@ jobs:
       - name: Run tests
         run: pnpm test
 
-      # Uses npm OIDC trusted publishers for authentication (no token needed)
-      # Packages must be linked to this repo on npmjs.com with provenance enabled
+      # First publish requires NPM_TOKEN. After packages exist, can switch to OIDC.
       - name: Publish to npm
         run: pnpm -r publish --access public --no-git-checks --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
