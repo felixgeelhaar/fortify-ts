@@ -38,12 +38,13 @@ jobs:
       - name: Run tests
         run: pnpm test
 
+      # npm CLI automatically detects OIDC environments and uses them for authentication.
+      # For initial publish (before trusted publishers are configured), set NPM_TOKEN secret.
+      # After configuring trusted publishers on npmjs.com, NPM_TOKEN can be removed.
       - name: Publish to npm
-        run: |
-          pnpm -r publish --access public --no-git-checks
+        run: pnpm -r publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
