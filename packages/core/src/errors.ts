@@ -6,7 +6,8 @@ export class FortifyError extends Error {
     super(message);
     this.name = 'FortifyError';
     // Maintains proper stack trace for where our error was thrown (only available on V8)
-    if (Error.captureStackTrace) {
+    // Use typeof check to avoid unnecessary-condition lint error
+    if (typeof Error.captureStackTrace === 'function') {
       Error.captureStackTrace(this, this.constructor);
     }
   }

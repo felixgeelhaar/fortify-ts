@@ -250,7 +250,7 @@ export function createDegradedResponse(
  * ```
  */
 export function composeChaos(
-  ...injectors: Array<<T>(op: Operation<T>) => Operation<T>>
+  ...injectors: (<T>(op: Operation<T>) => Operation<T>)[]
 ): <T>(operation: Operation<T>) => Operation<T> {
   return <T>(operation: Operation<T>): Operation<T> => {
     return injectors.reduce(

@@ -142,7 +142,7 @@ export class Retry<T> implements Pattern<T> {
 
     // All attempts exhausted or error not retryable
     throw new MaxAttemptsReachedError(
-      `Operation failed after ${this.config.maxAttempts} attempts`,
+      `Operation failed after ${String(this.config.maxAttempts)} attempts`,
       this.config.maxAttempts,
       lastError
     );

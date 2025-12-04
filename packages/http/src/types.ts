@@ -67,7 +67,7 @@ export const keyFromIp: KeyExtractor = (request: HttpRequest): string => {
  */
 export function keyFromHeader(
   header: string,
-  defaultValue: string = 'unknown'
+  defaultValue = 'unknown'
 ): KeyExtractor {
   return (request: HttpRequest): string => {
     const value = request.headers[header.toLowerCase()];
@@ -87,7 +87,7 @@ export function keyFromHeader(
  */
 export function combineKeys(
   extractors: KeyExtractor[],
-  separator: string = ':'
+  separator = ':'
 ): KeyExtractor {
   return (request: HttpRequest): string => {
     return extractors.map((e) => e(request)).join(separator);

@@ -49,7 +49,7 @@ export class CircuitBreaker<T> implements Pattern<T>, Resettable {
   private currentState: State = States.CLOSED;
   private counts: Counts = createCounts();
   private lastStateChange: number = Date.now();
-  private halfOpenRequests: number = 0;
+  private halfOpenRequests = 0;
 
   // Interval timer for clearing counts
   private intervalId: ReturnType<typeof setInterval> | undefined;

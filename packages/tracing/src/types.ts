@@ -29,7 +29,7 @@ export type AttributeValue =
   | string
   | number
   | boolean
-  | Array<string | number | boolean>;
+  | (string | number | boolean)[];
 
 /**
  * Attributes (key-value pairs).

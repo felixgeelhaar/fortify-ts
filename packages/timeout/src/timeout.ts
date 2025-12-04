@@ -94,7 +94,7 @@ export class Timeout<T> implements Pattern<T> {
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
         const error = new TimeoutError(
-          `Operation timed out after ${timeoutMs}ms`,
+          `Operation timed out after ${String(timeoutMs)}ms`,
           timeoutMs
         );
         controller.abort(error);

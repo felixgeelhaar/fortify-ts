@@ -133,7 +133,7 @@ export function createResilienceLogger(logger: FortifyLogger): ResilienceLogger 
       error: Error,
       context?: LogContext
     ): void {
-      logger.warn(`Retry ${name} attempt ${attempt}/${maxAttempts}`, {
+      logger.warn(`Retry ${name} attempt ${String(attempt)}/${String(maxAttempts)}`, {
         pattern: 'retry',
         name,
         attempt,
@@ -161,7 +161,7 @@ export function createResilienceLogger(logger: FortifyLogger): ResilienceLogger 
       duration: number,
       context?: LogContext
     ): void {
-      logger.warn(`Timeout ${name} exceeded after ${duration}ms`, {
+      logger.warn(`Timeout ${name} exceeded after ${String(duration)}ms`, {
         pattern: 'timeout',
         name,
         duration,

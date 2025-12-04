@@ -5,7 +5,7 @@ import { type Operation, sleep } from '@fortify-ts/core';
  */
 export interface MockOperationConfig<T> {
   /** Results to return in sequence */
-  results?: Array<T | Error>;
+  results?: (T | Error)[];
   /** Default result after sequence is exhausted */
   defaultResult?: T | Error;
   /** Delay before each call in milliseconds */
@@ -41,14 +41,14 @@ export function createMockOperation<T>(
   operation: Operation<T>;
   stats: {
     callCount: number;
-    calls: Array<{ timestamp: number; signal?: AbortSignal }>;
+    calls: { timestamp: number; signal?: AbortSignal }[];
     reset: () => void;
   };
 } {
   const { results = [], defaultResult, delayMs, onCall } = config;
 
   let callCount = 0;
-  const calls: Array<{ timestamp: number; signal?: AbortSignal }> = [];
+  const calls: { timestamp: number; signal?: AbortSignal }[] = [];
 
   const operation: Operation<T> = async (signal: AbortSignal): Promise<T> => {
     const currentCall = callCount;
@@ -143,12 +143,12 @@ export function createFailThenSucceed<T>(
 } {
   let attempts = 0;
 
-  const operation: Operation<T> = async (): Promise<T> => {
+  const operation: Operation<T> = (): Promise<T> => {
     attempts++;
     if (attempts <= failCount) {
-      throw error;
+      return Promise.reject(error);
     }
-    return successResult;
+    return Promise.resolve(successResult);
   };
 
   return {
@@ -164,8 +164,8 @@ export function createFailThenSucceed<T>(
  * @returns Operation that always throws
  */
 export function createFailingOperation<T>(error: Error): Operation<T> {
-  return async (): Promise<T> => {
-    throw error;
+  return (): Promise<T> => {
+    return Promise.reject(error);
   };
 }
 
@@ -176,8 +176,8 @@ export function createFailingOperation<T>(error: Error): Operation<T> {
  * @returns Operation that always succeeds
  */
 export function createSuccessfulOperation<T>(result: T): Operation<T> {
-  return async (): Promise<T> => {
-    return result;
+  return (): Promise<T> => {
+    return Promise.resolve(result);
   };
 }
 
@@ -190,12 +190,12 @@ export function createSuccessfulOperation<T>(result: T): Operation<T> {
 export function createConfigurableOperation<T>(
   behavior: () => T | Error
 ): Operation<T> {
-  return async (): Promise<T> => {
+  return (): Promise<T> => {
     const result = behavior();
     if (result instanceof Error) {
-      throw result;
+      return Promise.reject(result);
     }
-    return result;
+    return Promise.resolve(result);
   };
 }
 
@@ -225,7 +225,7 @@ export function createSlowOperation<T>(
  */
 export function createAbortableOperation<T>(
   result: T,
-  delayMs: number = 100
+  delayMs = 100
 ): Operation<T> {
   return async (signal: AbortSignal): Promise<T> => {
     await sleep(delayMs, signal);

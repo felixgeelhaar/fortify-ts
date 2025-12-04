@@ -84,7 +84,7 @@ export function createRetryMiddleware(
           context: { ...request.context, signal },
         });
         if (shouldRetry(response)) {
-          throw new Error(`Server error: ${response.status}`);
+          throw new Error(`Server error: ${String(response.status)}`);
         }
         return response;
       });

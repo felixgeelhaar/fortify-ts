@@ -84,7 +84,7 @@ export function traceOperation<T>(
 export function createCircuitBreakerTracer(
   tracer: Tracer,
   name: string,
-  prefix: string = 'fortify'
+  prefix = 'fortify'
 ) {
   return function traceCircuitBreaker<T>(
     operation: Operation<T>,
@@ -120,7 +120,7 @@ export function createCircuitBreakerTracer(
 export function createRetryTracer(
   tracer: Tracer,
   name: string,
-  prefix: string = 'fortify'
+  prefix = 'fortify'
 ) {
   return function traceRetry<T>(
     operation: Operation<T>,
@@ -155,7 +155,7 @@ export function createRetryTracer(
 export function createRateLimitTracer(
   tracer: Tracer,
   name: string,
-  prefix: string = 'fortify'
+  prefix = 'fortify'
 ) {
   return function traceRateLimit<T>(
     operation: Operation<T>,
@@ -190,7 +190,7 @@ export function createRateLimitTracer(
 export function createTimeoutTracer(
   tracer: Tracer,
   name: string,
-  prefix: string = 'fortify'
+  prefix = 'fortify'
 ) {
   return function traceTimeout<T>(
     operation: Operation<T>,
@@ -224,7 +224,7 @@ export function createTimeoutTracer(
 export function createBulkheadTracer(
   tracer: Tracer,
   name: string,
-  prefix: string = 'fortify'
+  prefix = 'fortify'
 ) {
   return function traceBulkhead<T>(
     operation: Operation<T>,
@@ -257,7 +257,7 @@ export function createBulkheadTracer(
 export function createFallbackTracer(
   tracer: Tracer,
   name: string,
-  prefix: string = 'fortify'
+  prefix = 'fortify'
 ) {
   return function traceFallback<T>(
     operation: Operation<T>,

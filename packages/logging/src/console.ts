@@ -87,8 +87,9 @@ export function createConsoleLogger(config: ConsoleLoggerConfig = {}): FortifyLo
     const childLogger = createConsoleLogger(childConfig);
 
     // Merge bindings
+    const childBoundContext = (childLogger as unknown as { boundContext: LogContext }).boundContext;
     Object.assign(
-      (childLogger as unknown as { boundContext: LogContext }).boundContext ?? {},
+      childBoundContext,
       boundContext,
       additionalBindings
     );
@@ -100,7 +101,7 @@ export function createConsoleLogger(config: ConsoleLoggerConfig = {}): FortifyLo
     debug(msg: string, context?: LogContext): void {
       if (shouldLog('debug')) {
         const output = formatMessage('debug', msg, context);
-        // eslint-disable-next-line no-console
+         
         console.debug(json ? JSON.stringify(output) : output);
       }
     },
@@ -108,7 +109,7 @@ export function createConsoleLogger(config: ConsoleLoggerConfig = {}): FortifyLo
     info(msg: string, context?: LogContext): void {
       if (shouldLog('info')) {
         const output = formatMessage('info', msg, context);
-        // eslint-disable-next-line no-console
+         
         console.info(json ? JSON.stringify(output) : output);
       }
     },
@@ -116,7 +117,7 @@ export function createConsoleLogger(config: ConsoleLoggerConfig = {}): FortifyLo
     warn(msg: string, context?: LogContext): void {
       if (shouldLog('warn')) {
         const output = formatMessage('warn', msg, context);
-        // eslint-disable-next-line no-console
+         
         console.warn(json ? JSON.stringify(output) : output);
       }
     },
@@ -124,7 +125,7 @@ export function createConsoleLogger(config: ConsoleLoggerConfig = {}): FortifyLo
     error(msg: string, context?: LogContext): void {
       if (shouldLog('error')) {
         const output = formatMessage('error', msg, context);
-        // eslint-disable-next-line no-console
+         
         console.error(json ? JSON.stringify(output) : output);
       }
     },

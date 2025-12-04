@@ -10,7 +10,7 @@ import { TimeoutError } from './errors.js';
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
-      reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+      reject(ensureError(signal.reason));
       return;
     }
 
@@ -20,11 +20,34 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       'abort',
       () => {
         clearTimeout(timeoutId);
-        reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+        reject(ensureError(signal.reason));
       },
       { once: true }
     );
   });
+}
+
+/**
+ * Ensure a value is an Error instance.
+ * @param reason - The reason to convert to an Error
+ * @returns An Error instance
+ */
+function ensureError(reason: unknown): Error {
+  if (reason instanceof Error) {
+    return reason;
+  }
+  if (typeof reason === 'string') {
+    return new Error(reason);
+  }
+  if (reason !== undefined && reason !== null) {
+    // Handle objects and other types safely
+    try {
+      return new Error(JSON.stringify(reason));
+    } catch {
+      return new Error('Unknown error');
+    }
+  }
+  return new DOMException('Aborted', 'AbortError');
 }
 
 /**
@@ -43,14 +66,14 @@ export async function withTimeout<T>(
 ): Promise<T> {
   // Check if already aborted
   if (signal?.aborted) {
-    throw signal.reason ?? new DOMException('Aborted', 'AbortError');
+    throw ensureError(signal.reason);
   }
 
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
-      reject(new TimeoutError(`Operation timed out after ${ms}ms`, ms));
+      reject(new TimeoutError(`Operation timed out after ${String(ms)}ms`, ms));
     }, ms);
   });
 
@@ -59,14 +82,14 @@ export async function withTimeout<T>(
     ? new Promise<never>((_, reject) => {
         signal.addEventListener(
           'abort',
-          () => reject(signal.reason ?? new DOMException('Aborted', 'AbortError')),
+          () => reject(ensureError(signal.reason)),
           { once: true }
         );
       })
     : null;
 
   try {
-    const racers: Promise<T | never>[] = [promise, timeoutPromise];
+    const racers: Promise<T>[] = [promise, timeoutPromise];
     if (abortPromise) {
       racers.push(abortPromise);
     }
@@ -98,7 +121,7 @@ export async function executeWithTimeout<T>(
   const combinedSignal = combineSignals(signal, controller.signal);
 
   const timeoutId = setTimeout(() => {
-    controller.abort(new TimeoutError(`Operation timed out after ${ms}ms`, ms));
+    controller.abort(new TimeoutError(`Operation timed out after ${String(ms)}ms`, ms));
   }, ms);
 
   try {
@@ -138,7 +161,7 @@ export function combineSignals(...signals: (AbortSignal | undefined)[]): AbortSi
   // Fallback: create a new controller and link it to all signals
   // Track listeners so we can clean them up to prevent memory leaks
   const controller = new AbortController();
-  const listeners: Array<{ signal: AbortSignal; listener: () => void }> = [];
+  const listeners: { signal: AbortSignal; listener: () => void }[] = [];
 
   // Cleanup function to remove all listeners
   const cleanup = () => {
@@ -235,7 +258,7 @@ export function clamp(value: number, min: number, max: number): number {
  * @returns Current timestamp in milliseconds
  */
 export function now(): number {
-  if (typeof performance !== 'undefined' && performance.now) {
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
     return performance.now();
   }
   return Date.now();
