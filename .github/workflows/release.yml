@@ -27,7 +27,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'pnpm'
-          # Note: registry-url omitted to allow npm OIDC trusted publishers to work
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -38,9 +38,11 @@ jobs:
       - name: Run tests
         run: pnpm test
 
-      # Uses npm OIDC trusted publishers - packages linked to this repo on npmjs.com
+      # NPM_TOKEN for authentication, --provenance for signed attestation
       - name: Publish to npm
         run: pnpm -r publish --access public --no-git-checks --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
