@@ -44,5 +44,6 @@
     "default-value",
     "resilience"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "sideEffects": false
 }

@@ -35,8 +35,9 @@
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
-    "zod": "^3.0.0"
+    "zod": "^4.0.0"
   },
+  "sideEffects": false,
   "repository": {
     "type": "git",
     "url": "https://github.com/felixgeelhaar/fortify-ts.git",

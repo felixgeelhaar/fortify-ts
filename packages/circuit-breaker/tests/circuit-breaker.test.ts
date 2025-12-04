@@ -133,6 +133,39 @@ describe('CircuitBreaker', () => {
       cb.destroy();
     });
 
+    it('should add jitter to timeout when configured', async () => {
+      // Mock Math.random to return 1.0 (max jitter)
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(1.0);
+
+      const cb = new CircuitBreaker<string>({
+        maxFailures: 1,
+        timeout: 5000,
+        timeoutJitter: 0.2, // 20% jitter, so max timeout = 5000 + 1000 = 6000
+      });
+
+      // Trip the circuit
+      await expect(cb.execute(async () => {
+        throw new Error('fail');
+      })).rejects.toThrow();
+
+      await vi.runAllTimersAsync();
+      expect(cb.state()).toBe(States.OPEN);
+
+      // Advance by base timeout (5000ms) - should still be open due to jitter
+      vi.advanceTimersByTime(5000);
+      await expect(cb.execute(async () => 'success')).rejects.toThrow(CircuitOpenError);
+      expect(cb.state()).toBe(States.OPEN);
+
+      // Advance by jitter amount (1000ms more) - now should transition
+      vi.advanceTimersByTime(1000);
+      await cb.execute(async () => 'success');
+      await vi.runAllTimersAsync();
+      expect(cb.state()).toBe(States.CLOSED);
+
+      cb.destroy();
+      randomSpy.mockRestore();
+    });
+
     it('should close after success in half-open', async () => {
       const cb = new CircuitBreaker<string>({ maxFailures: 1, timeout: 5000 });
 

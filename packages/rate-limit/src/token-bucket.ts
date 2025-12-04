@@ -7,8 +7,8 @@
 export class TokenBucket {
   private tokens: number;
   private readonly burst: number;
-  private readonly rate: number;
-  private readonly intervalMs: number;
+  /** Pre-calculated tokens per millisecond for performance */
+  private readonly tokensPerMs: number;
   private lastRefill: number;
 
   /**
@@ -19,9 +19,9 @@ export class TokenBucket {
    * @param intervalMs - Time interval in milliseconds for rate replenishment
    */
   constructor(rate: number, burst: number, intervalMs: number) {
-    this.rate = rate;
     this.burst = burst;
-    this.intervalMs = intervalMs;
+    // Pre-calculate tokens per millisecond for performance
+    this.tokensPerMs = intervalMs > 0 ? rate / intervalMs : 0;
     this.tokens = burst; // Start with full bucket
     this.lastRefill = Date.now();
   }
@@ -83,25 +83,12 @@ export class TokenBucket {
       return 0;
     }
 
-    // Safety check: if rate is 0 or negative
-    if (this.rate <= 0) {
+    // Safety check: if tokens per ms is effectively zero (pre-calculated)
+    if (this.tokensPerMs <= 0) {
       return 24 * 60 * 60 * 1000; // 24 hours in ms
     }
 
-    // Safety check: prevent division by zero
-    if (this.intervalMs <= 0) {
-      return 24 * 60 * 60 * 1000;
-    }
-
-    // Calculate tokens per millisecond
-    const tokensPerMs = this.rate / this.intervalMs;
-
-    // Safety check: if tokens per ms is effectively zero
-    if (tokensPerMs <= 0) {
-      return 24 * 60 * 60 * 1000;
-    }
-
-    const msToWait = tokensNeeded / tokensPerMs;
+    const msToWait = tokensNeeded / this.tokensPerMs;
 
     // Safety check: ensure result is within reasonable bounds
     if (msToWait < 0) {
@@ -120,15 +107,20 @@ export class TokenBucket {
     const now = Date.now();
     const elapsed = now - this.lastRefill;
 
+    // Handle clock skew (negative elapsed time)
     if (elapsed <= 0) {
+      // Update lastRefill to prevent repeated negative calculations
+      if (elapsed < 0) {
+        this.lastRefill = now;
+      }
       return;
     }
 
     // Cap elapsed time to prevent overflow from clock skew or system sleep
     const cappedElapsed = Math.min(elapsed, 60 * 60 * 1000); // Max 1 hour
 
-    // Calculate tokens to add: (elapsed / interval) * rate
-    const tokensToAdd = (cappedElapsed / this.intervalMs) * this.rate;
+    // Calculate tokens to add using pre-calculated tokensPerMs
+    const tokensToAdd = cappedElapsed * this.tokensPerMs;
 
     this.tokens = Math.min(this.tokens + tokensToAdd, this.burst);
     this.lastRefill = now;

@@ -17,7 +17,6 @@ export {
   type RateLimitMiddlewareConfig,
   type TimeoutMiddlewareConfig,
   type BulkheadMiddlewareConfig,
-  type FallbackMiddlewareConfig,
   createCircuitBreakerMiddleware,
   createRetryMiddleware,
   createRateLimitMiddleware,

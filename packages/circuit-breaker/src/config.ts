@@ -15,6 +15,8 @@ export const circuitBreakerConfigSchema = z.object({
   halfOpenMaxRequests: z.number().int().positive().default(1),
   /** Period to clear counts when closed, 0 means never (default: 0) */
   interval: z.number().int().nonnegative().default(0),
+  /** Jitter factor for timeout (0-1), adds randomness to prevent thundering herd (default: 0) */
+  timeoutJitter: z.number().min(0).max(1).default(0),
 });
 
 /**

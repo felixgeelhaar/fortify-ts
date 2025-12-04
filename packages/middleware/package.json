@@ -50,5 +50,6 @@
     "composition",
     "resilience"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "sideEffects": false
 }

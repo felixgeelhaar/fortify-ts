@@ -1,22 +1,34 @@
+import { RingBuffer } from './ring-buffer.js';
+
+/**
+ * Waiter in the semaphore queue.
+ */
+interface Waiter {
+  resolve: () => void;
+  reject: (error: Error) => void;
+  signal?: AbortSignal;
+  onAbort?: () => void;
+}
+
 /**
  * A Promise-based semaphore for limiting concurrent operations.
+ * Uses an O(1) ring buffer for the waiting queue.
  */
 export class Semaphore {
   private permits: number;
   private readonly maxPermits: number;
-  private readonly waitingQueue: Array<{
-    resolve: () => void;
-    reject: (error: Error) => void;
-  }> = [];
+  private readonly waitingQueue: RingBuffer<Waiter>;
 
   /**
    * Create a new semaphore.
    *
    * @param maxPermits - Maximum number of concurrent permits
+   * @param maxQueue - Maximum queue size (defaults to 1000)
    */
-  constructor(maxPermits: number) {
+  constructor(maxPermits: number, maxQueue = 1000) {
     this.maxPermits = maxPermits;
     this.permits = maxPermits;
+    this.waitingQueue = new RingBuffer<Waiter>(maxQueue);
   }
 
   /**
@@ -55,21 +67,22 @@ export class Semaphore {
 
     // Add to wait queue
     return new Promise<void>((resolve, reject) => {
-      const waiter = { resolve, reject };
-      this.waitingQueue.push(waiter);
+      const waiter: Waiter = { resolve, reject };
 
       // Set up abort handler
       if (signal) {
         const onAbort = () => {
-          const index = this.waitingQueue.indexOf(waiter);
-          if (index !== -1) {
-            this.waitingQueue.splice(index, 1);
+          if (this.waitingQueue.remove(waiter)) {
             reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
           }
         };
 
+        waiter.signal = signal;
+        waiter.onAbort = onAbort;
         signal.addEventListener('abort', onAbort, { once: true });
       }
+
+      this.waitingQueue.push(waiter);
     });
   }
 
@@ -77,10 +90,16 @@ export class Semaphore {
    * Release a permit back to the semaphore.
    */
   release(): void {
-    if (this.waitingQueue.length > 0) {
-      // Give permit to next waiter
+    if (!this.waitingQueue.isEmpty()) {
+      // Give permit to next waiter (O(1) with ring buffer)
       const waiter = this.waitingQueue.shift();
-      waiter?.resolve();
+      if (waiter) {
+        // Clean up abort listener to prevent memory leak
+        if (waiter.signal && waiter.onAbort) {
+          waiter.signal.removeEventListener('abort', waiter.onAbort);
+        }
+        waiter.resolve();
+      }
     } else if (this.permits < this.maxPermits) {
       // Return permit to pool
       this.permits++;
@@ -105,8 +124,12 @@ export class Semaphore {
    * Reject all waiters with the given error.
    */
   rejectAll(error: Error): void {
-    const waiters = this.waitingQueue.splice(0, this.waitingQueue.length);
+    const waiters = this.waitingQueue.drain();
     for (const waiter of waiters) {
+      // Clean up abort listener to prevent memory leak
+      if (waiter.signal && waiter.onAbort) {
+        waiter.signal.removeEventListener('abort', waiter.onAbort);
+      }
       waiter.reject(error);
     }
   }

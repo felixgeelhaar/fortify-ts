@@ -38,6 +38,7 @@ export {
   executeWithTimeout,
   combineSignals,
   isAbortError,
+  throwIfAborted,
   safeCallback,
   addJitter,
   clamp,

@@ -56,5 +56,6 @@
     "pino",
     "fortify"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "sideEffects": false
 }

@@ -56,5 +56,6 @@
     "prometheus",
     "fortify"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "sideEffects": false
 }

@@ -241,23 +241,13 @@ export function createBulkheadMiddleware(
 }
 
 /**
- * Configuration for fallback HTTP middleware.
- */
-export interface FallbackMiddlewareConfig {
-  /** Determine if error should trigger fallback */
-  shouldFallback?: (error: Error) => boolean;
-}
-
-/**
  * Create HTTP middleware that provides fallback responses.
  *
- * @param fallback - Fallback instance
- * @param config - Optional middleware configuration
+ * @param fallback - Fallback instance (configure shouldFallback on the Fallback instance)
  * @returns HTTP middleware function
  */
 export function createFallbackMiddleware(
-  fallback: Fallback<HttpResponse>,
-  _config?: FallbackMiddlewareConfig
+  fallback: Fallback<HttpResponse>
 ): HttpMiddleware {
   return (handler: HttpHandler): HttpHandler => {
     return async (request) => {

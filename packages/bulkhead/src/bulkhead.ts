@@ -5,7 +5,6 @@ import {
   BulkheadFullError,
   type FortifyLogger,
   noopLogger,
-  sleep,
 } from '@fortify-ts/core';
 import {
   type BulkheadConfig,
@@ -51,11 +50,16 @@ export class Bulkhead<T> implements Pattern<T>, Resettable {
   constructor(config?: BulkheadConfigInputFull) {
     this.config = parseBulkheadConfig(config);
     this.logger = this.config.logger ?? noopLogger;
-    this.semaphore = new Semaphore(this.config.maxConcurrent);
+    // Execution semaphore: queue capacity = maxQueue (bounded by queue semaphore)
+    this.semaphore = new Semaphore(
+      this.config.maxConcurrent,
+      Math.max(this.config.maxQueue, 1) // At least 1 for edge cases
+    );
 
     // Only create queue semaphore if maxQueue > 0
     if (this.config.maxQueue > 0) {
-      this.queueSemaphore = new Semaphore(this.config.maxQueue);
+      // Queue semaphore: only used for tryAcquire, queue never used
+      this.queueSemaphore = new Semaphore(this.config.maxQueue, 1);
     }
   }
 
@@ -71,7 +75,7 @@ export class Bulkhead<T> implements Pattern<T>, Resettable {
   async execute(operation: Operation<T>, signal?: AbortSignal): Promise<T> {
     // Check if closed
     if (this.closed) {
-      throw new BulkheadFullError();
+      throw this.createFullError('Bulkhead is closed');
     }
 
     // Check if cancelled
@@ -109,8 +113,9 @@ export class Bulkhead<T> implements Pattern<T>, Resettable {
     if (this.closed) return;
 
     this.closed = true;
-    this.semaphore.rejectAll(new BulkheadFullError());
-    this.queueSemaphore?.rejectAll(new BulkheadFullError());
+    const closeError = this.createFullError('Bulkhead closed');
+    this.semaphore.rejectAll(closeError);
+    this.queueSemaphore?.rejectAll(closeError);
     this.logger.info('Bulkhead closed');
   }
 
@@ -146,15 +151,18 @@ export class Bulkhead<T> implements Pattern<T>, Resettable {
     // If no queue configured, reject immediately
     if (this.config.maxQueue === 0) {
       this.onRejected();
-      throw new BulkheadFullError();
+      throw this.createFullError('Bulkhead is full - no queue configured');
     }
 
     // Try to acquire queue slot
     if (!this.queueSemaphore?.tryAcquire()) {
       // Queue is full, reject
       this.onRejected();
-      throw new BulkheadFullError();
+      throw this.createFullError('Bulkhead queue is full');
     }
+
+    // Track timeout for cleanup in finally block
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     try {
       // Create combined signal for queue timeout
@@ -171,10 +179,10 @@ export class Bulkhead<T> implements Pattern<T>, Resettable {
           combinedSignal = timeoutController.signal;
         }
 
-        // Start timeout
-        sleep(this.config.queueTimeout).then(() => {
+        // Start timeout with proper cleanup
+        timeoutId = setTimeout(() => {
           timeoutController?.abort(new DOMException('Queue timeout', 'TimeoutError'));
-        });
+        }, this.config.queueTimeout);
       }
 
       // Wait for execution semaphore
@@ -194,6 +202,10 @@ export class Bulkhead<T> implements Pattern<T>, Resettable {
       // Got permit, execute
       return await this.executeWithPermit(operation, signal);
     } finally {
+      // Clear timeout to prevent memory leak
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       this.queueSemaphore?.release();
     }
   }
@@ -216,5 +228,16 @@ export class Bulkhead<T> implements Pattern<T>, Resettable {
         });
       }
     }
+  }
+
+  /**
+   * Create a BulkheadFullError with current state context.
+   */
+  private createFullError(message?: string): BulkheadFullError {
+    return new BulkheadFullError(
+      message ?? 'Bulkhead is full',
+      this.activeCount(),
+      this.queuedCount()
+    );
   }
 }

@@ -51,6 +51,9 @@ export class CircuitBreaker<T> implements Pattern<T>, Resettable {
   private lastStateChange: number = Date.now();
   private halfOpenRequests = 0;
 
+  // Timestamp when OPEN state should transition to HALF_OPEN (includes jitter)
+  private openUntil = 0;
+
   // Interval timer for clearing counts
   private intervalId: ReturnType<typeof setInterval> | undefined;
 
@@ -170,8 +173,8 @@ export class CircuitBreaker<T> implements Pattern<T>, Resettable {
         return true;
 
       case States.OPEN:
-        // Check if timeout has elapsed
-        if (Date.now() - this.lastStateChange >= this.config.timeout) {
+        // Check if timeout (with jitter) has elapsed
+        if (Date.now() >= this.openUntil) {
           this.setState(States.HALF_OPEN);
           this.halfOpenRequests = 1;
           return true;
@@ -282,6 +285,14 @@ export class CircuitBreaker<T> implements Pattern<T>, Resettable {
 
     this.currentState = newState;
     this.lastStateChange = Date.now();
+
+    // Calculate jittered timeout end for OPEN state
+    if (newState === States.OPEN) {
+      const jitter = this.config.timeoutJitter > 0
+        ? Math.random() * this.config.timeout * this.config.timeoutJitter
+        : 0;
+      this.openUntil = this.lastStateChange + this.config.timeout + jitter;
+    }
 
     this.logger.info('Circuit breaker state changed', {
       from: oldState,

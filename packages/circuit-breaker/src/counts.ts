@@ -33,26 +33,30 @@ export function createCounts(): Counts {
 
 /**
  * Record a successful execution.
+ * Mutates the counts object in place for performance.
+ *
+ * @param counts - The counts object to update
+ * @returns The same counts object (for chaining)
  */
 export function recordSuccess(counts: Counts): Counts {
-  return {
-    requests: counts.requests + 1,
-    totalSuccesses: counts.totalSuccesses + 1,
-    totalFailures: counts.totalFailures,
-    consecutiveSuccesses: counts.consecutiveSuccesses + 1,
-    consecutiveFailures: 0,
-  };
+  counts.requests++;
+  counts.totalSuccesses++;
+  counts.consecutiveSuccesses++;
+  counts.consecutiveFailures = 0;
+  return counts;
 }
 
 /**
  * Record a failed execution.
+ * Mutates the counts object in place for performance.
+ *
+ * @param counts - The counts object to update
+ * @returns The same counts object (for chaining)
  */
 export function recordFailure(counts: Counts): Counts {
-  return {
-    requests: counts.requests + 1,
-    totalSuccesses: counts.totalSuccesses,
-    totalFailures: counts.totalFailures + 1,
-    consecutiveSuccesses: 0,
-    consecutiveFailures: counts.consecutiveFailures + 1,
-  };
+  counts.requests++;
+  counts.totalFailures++;
+  counts.consecutiveSuccesses = 0;
+  counts.consecutiveFailures++;
+  return counts;
 }

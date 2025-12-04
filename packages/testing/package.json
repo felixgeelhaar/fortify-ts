@@ -32,6 +32,13 @@
     "@fortify-ts/core": "workspace:*"
   },
   "devDependencies": {
+    "@fortify-ts/bulkhead": "workspace:*",
+    "@fortify-ts/circuit-breaker": "workspace:*",
+    "@fortify-ts/fallback": "workspace:*",
+    "@fortify-ts/middleware": "workspace:*",
+    "@fortify-ts/rate-limit": "workspace:*",
+    "@fortify-ts/retry": "workspace:*",
+    "@fortify-ts/timeout": "workspace:*",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.15"
@@ -47,5 +54,6 @@
     "chaos-engineering",
     "fortify"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "sideEffects": false
 }

@@ -203,6 +203,19 @@ export function isAbortError(error: unknown): boolean {
 }
 
 /**
+ * Throw if the given signal is aborted.
+ * Useful for checking signal state early in operations to avoid unnecessary work.
+ *
+ * @param signal - AbortSignal to check
+ * @throws {DOMException} If signal is aborted (AbortError)
+ */
+export function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw signal.reason ?? new DOMException('Aborted', 'AbortError');
+  }
+}
+
+/**
  * Safely execute a callback, catching and logging any errors.
  * Used for user-provided callbacks to prevent them from breaking the pattern.
  *
