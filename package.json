@@ -12,6 +12,9 @@
   "type": "module",
   "scripts": {
     "build": "turbo build",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "changeset:publish": "changeset publish",
     "clean": "turbo clean && rm -rf node_modules",
     "dev": "turbo dev",
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
@@ -21,6 +24,7 @@
     "typecheck": "turbo typecheck"
   },
   "devDependencies": {
+    "@changesets/cli": "2.29.8",
     "@types/node": "^24.10.1",
     "eslint": "^9.39.1",
     "fast-check": "4.3.0",
