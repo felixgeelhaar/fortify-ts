@@ -1,6 +1,6 @@
 {
   "name": "@fortify-ts/metrics",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Prometheus metrics for fortify-ts resilience patterns",
   "type": "module",
   "main": "./dist/index.cjs",
