@@ -50,6 +50,13 @@
     "url": "https://github.com/felixgeelhaar/fortify-ts.git",
     "directory": "packages/logging"
   },
+  "homepage": "https://github.com/felixgeelhaar/fortify-ts/tree/main/packages/logging#readme",
+  "bugs": {
+    "url": "https://github.com/felixgeelhaar/fortify-ts/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "keywords": [
     "resilience",
     "logging",

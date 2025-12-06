@@ -23,26 +23,67 @@
   ],
   "scripts": {
     "build": "tsup",
+    "clean": "rm -rf dist",
+    "dev": "tsup --watch",
+    "lint": "eslint src",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@fortify-ts/core": "workspace:*",
+    "@fortify-ts/core": "workspace:*"
+  },
+  "devDependencies": {
     "@fortify-ts/timeout": "workspace:*",
     "@fortify-ts/retry": "workspace:*",
     "@fortify-ts/circuit-breaker": "workspace:*",
     "@fortify-ts/rate-limit": "workspace:*",
     "@fortify-ts/bulkhead": "workspace:*",
-    "@fortify-ts/fallback": "workspace:*"
+    "@fortify-ts/fallback": "workspace:*",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.15"
   },
-  "devDependencies": {
-    "typescript": "^5.9.3"
+  "peerDependencies": {
+    "@fortify-ts/timeout": "^0.1.0",
+    "@fortify-ts/retry": "^0.1.0",
+    "@fortify-ts/circuit-breaker": "^0.1.0",
+    "@fortify-ts/rate-limit": "^0.1.0",
+    "@fortify-ts/bulkhead": "^0.1.0",
+    "@fortify-ts/fallback": "^0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@fortify-ts/timeout": {
+      "optional": true
+    },
+    "@fortify-ts/retry": {
+      "optional": true
+    },
+    "@fortify-ts/circuit-breaker": {
+      "optional": true
+    },
+    "@fortify-ts/rate-limit": {
+      "optional": true
+    },
+    "@fortify-ts/bulkhead": {
+      "optional": true
+    },
+    "@fortify-ts/fallback": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/felixgeelhaar/fortify-ts.git",
     "directory": "packages/middleware"
+  },
+  "homepage": "https://github.com/felixgeelhaar/fortify-ts/tree/main/packages/middleware#readme",
+  "bugs": {
+    "url": "https://github.com/felixgeelhaar/fortify-ts/issues"
   },
   "keywords": [
     "middleware",

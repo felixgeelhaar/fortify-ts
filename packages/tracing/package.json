@@ -51,6 +51,13 @@
     "url": "https://github.com/felixgeelhaar/fortify-ts.git",
     "directory": "packages/tracing"
   },
+  "homepage": "https://github.com/felixgeelhaar/fortify-ts/tree/main/packages/tracing#readme",
+  "bugs": {
+    "url": "https://github.com/felixgeelhaar/fortify-ts/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "keywords": [
     "resilience",
     "tracing",

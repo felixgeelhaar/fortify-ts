@@ -45,9 +45,15 @@ importers:
         specifier: ^4.1.13
         version: 4.1.13
     devDependencies:
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(postcss@8.5.6)(typescript@5.9.3)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+      vitest:
+        specifier: ^4.0.15
+        version: 4.0.15(@opentelemetry/api@1.9.0)(@types/node@24.10.1)
 
   packages/circuit-breaker:
     dependencies:
@@ -90,9 +96,15 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(postcss@8.5.6)(typescript@5.9.3)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+      vitest:
+        specifier: ^4.0.15
+        version: 4.0.15(@opentelemetry/api@1.9.0)(@types/node@24.10.1)
 
   packages/http:
     dependencies:
@@ -171,15 +183,16 @@ importers:
 
   packages/middleware:
     dependencies:
+      '@fortify-ts/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
       '@fortify-ts/bulkhead':
         specifier: workspace:*
         version: link:../bulkhead
       '@fortify-ts/circuit-breaker':
         specifier: workspace:*
         version: link:../circuit-breaker
-      '@fortify-ts/core':
-        specifier: workspace:*
-        version: link:../core
       '@fortify-ts/fallback':
         specifier: workspace:*
         version: link:../fallback
@@ -192,10 +205,15 @@ importers:
       '@fortify-ts/timeout':
         specifier: workspace:*
         version: link:../timeout
-    devDependencies:
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(postcss@8.5.6)(typescript@5.9.3)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+      vitest:
+        specifier: ^4.0.15
+        version: 4.0.15(@opentelemetry/api@1.9.0)(@types/node@24.10.1)
 
   packages/rate-limit:
     dependencies:
@@ -206,9 +224,15 @@ importers:
         specifier: ^4.1.13
         version: 4.1.13
     devDependencies:
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(postcss@8.5.6)(typescript@5.9.3)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+      vitest:
+        specifier: ^4.0.15
+        version: 4.0.15(@opentelemetry/api@1.9.0)(@types/node@24.10.1)
 
   packages/retry:
     dependencies:

@@ -58,5 +58,12 @@
     "url": "https://github.com/felixgeelhaar/fortify-ts.git",
     "directory": "packages/core"
   },
+  "homepage": "https://github.com/felixgeelhaar/fortify-ts/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/felixgeelhaar/fortify-ts/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "sideEffects": false
 }

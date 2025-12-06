@@ -55,5 +55,12 @@
     "url": "https://github.com/felixgeelhaar/fortify-ts.git",
     "directory": "packages/timeout"
   },
+  "homepage": "https://github.com/felixgeelhaar/fortify-ts/tree/main/packages/timeout#readme",
+  "bugs": {
+    "url": "https://github.com/felixgeelhaar/fortify-ts/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "sideEffects": false
 }
