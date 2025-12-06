@@ -206,7 +206,7 @@ export class Bulkhead<T> implements Pattern<T>, Resettable {
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
-      this.queueSemaphore?.release();
+      this.queueSemaphore.release();
     }
   }
 

@@ -42,12 +42,15 @@ export interface FallbackConfig<T> {
 
 /**
  * Validate and return the fallback configuration.
+ * Runtime validation for JavaScript users or those bypassing TypeScript.
  *
  * @param config - Fallback configuration
  * @returns Validated configuration
  * @throws {Error} When fallback function is not provided
  */
 export function validateFallbackConfig<T>(config: FallbackConfig<T>): FallbackConfig<T> {
+  // Runtime check for JS users or those using `as any`
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   if (!config.fallback) {
     throw new Error('Fallback function is required');
   }

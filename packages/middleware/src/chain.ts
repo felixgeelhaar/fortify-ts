@@ -78,7 +78,7 @@ export class Chain<T> implements Pattern<T> {
    * @param key - Rate limiting key (e.g., user ID, IP address)
    * @returns this chain for method chaining
    */
-  withRateLimit(rl: RateLimiter, key: string = ''): this {
+  withRateLimit(rl: RateLimiter, key = ''): this {
     const middleware: Middleware<T> = (next) => async (signal) => {
       await rl.wait(key, signal);
       return next(signal);

@@ -54,9 +54,10 @@ export class Semaphore {
   acquire(signal?: AbortSignal): Promise<void> {
     // Check if cancelled
     if (signal?.aborted) {
-      return Promise.reject(
-        signal.reason ?? new DOMException('Aborted', 'AbortError')
-      );
+      const reason = signal.reason instanceof Error
+        ? signal.reason
+        : new DOMException('Aborted', 'AbortError');
+      return Promise.reject(reason);
     }
 
     // Try to acquire immediately
@@ -73,7 +74,10 @@ export class Semaphore {
       if (signal) {
         const onAbort = () => {
           if (this.waitingQueue.remove(waiter)) {
-            reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+            const reason = signal.reason instanceof Error
+              ? signal.reason
+              : new DOMException('Aborted', 'AbortError');
+            reject(reason);
           }
         };
 

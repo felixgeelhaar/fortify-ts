@@ -92,8 +92,9 @@ export class Fallback<T> implements Pattern<T> {
       }
 
       // Callback before fallback
-      if (this.config.onFallback) {
-        this.safeCallback(() => this.config.onFallback!(error));
+      const onFallback = this.config.onFallback;
+      if (onFallback) {
+        this.safeCallback(() => onFallback(error));
       }
 
       this.logger.info('Fallback triggered', {

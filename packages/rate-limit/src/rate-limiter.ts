@@ -62,7 +62,7 @@ export class RateLimiter implements Resettable {
    * @param key - Rate limiting key (e.g., user ID, IP address)
    * @returns true if the request is allowed, false if rate limited
    */
-  allow(key: string = ''): boolean {
+  allow(key = ''): boolean {
     const bucket = this.getBucket(key);
     const allowed = bucket.allow();
 
@@ -80,7 +80,7 @@ export class RateLimiter implements Resettable {
    * @param signal - Optional AbortSignal for cancellation
    * @throws {DOMException} When cancelled via signal (AbortError)
    */
-  async wait(key: string = '', signal?: AbortSignal): Promise<void> {
+  async wait(key = '', signal?: AbortSignal): Promise<void> {
     // Check if cancelled
     if (signal?.aborted) {
       throw signal.reason ?? new DOMException('Aborted', 'AbortError');
@@ -88,7 +88,7 @@ export class RateLimiter implements Resettable {
 
     const bucket = this.getBucket(key);
 
-    while (true) {
+    for (;;) {
       // Check if cancelled
       if (signal?.aborted) {
         throw signal.reason ?? new DOMException('Aborted', 'AbortError');
@@ -140,7 +140,7 @@ export class RateLimiter implements Resettable {
    */
   async execute<T>(
     operation: (signal: AbortSignal) => Promise<T>,
-    key: string = '',
+    key = '',
     signal?: AbortSignal
   ): Promise<T> {
     // Check if cancelled
