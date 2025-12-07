@@ -67,3 +67,14 @@ export {
   fallbackConfigSchema,
   type FallbackConfig,
 } from './schemas.js';
+
+// Storage
+export {
+  bucketStateSchema,
+  type BucketState,
+  validateBucketState,
+  type CompareAndSetResult,
+  sanitizeStorageKey,
+  type RateLimitStorage,
+  MemoryStorage,
+} from './storage.js';
