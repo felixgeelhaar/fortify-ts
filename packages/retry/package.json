@@ -1,6 +1,6 @@
 {
   "name": "@fortify-ts/retry",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Retry pattern with backoff strategies for Fortify TS resilience library",
   "type": "module",
   "main": "./dist/index.cjs",

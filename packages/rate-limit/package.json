@@ -1,6 +1,6 @@
 {
   "name": "@fortify-ts/rate-limit",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Token bucket rate limiter for @fortify-ts",
   "type": "module",
   "main": "./dist/index.cjs",

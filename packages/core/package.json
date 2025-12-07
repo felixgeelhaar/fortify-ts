@@ -1,6 +1,6 @@
 {
   "name": "@fortify-ts/core",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Core types, errors, and utilities for Fortify TS resilience library",
   "type": "module",
   "main": "./dist/index.cjs",

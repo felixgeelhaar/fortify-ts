@@ -1,6 +1,6 @@
 {
   "name": "@fortify-ts/timeout",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Timeout pattern for Fortify TS resilience library",
   "type": "module",
   "main": "./dist/index.cjs",

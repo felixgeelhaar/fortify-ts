@@ -1,6 +1,6 @@
 {
   "name": "@fortify-ts/fallback",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Fallback pattern for graceful degradation in @fortify-ts",
   "type": "module",
   "main": "./dist/index.cjs",
