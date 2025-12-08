@@ -1,6 +1,6 @@
 {
   "name": "@fortify-ts/middleware",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Middleware composition chain for @fortify-ts resilience patterns",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -46,12 +46,12 @@
     "vitest": "^4.0.15"
   },
   "peerDependencies": {
-    "@fortify-ts/timeout": "^0.1.5",
-    "@fortify-ts/retry": "^0.1.5",
-    "@fortify-ts/circuit-breaker": "^0.1.5",
-    "@fortify-ts/rate-limit": "^0.2.0",
-    "@fortify-ts/bulkhead": "^0.1.5",
-    "@fortify-ts/fallback": "^0.1.5"
+    "@fortify-ts/timeout": "^0.2.0",
+    "@fortify-ts/retry": "^0.2.0",
+    "@fortify-ts/circuit-breaker": "^0.2.0",
+    "@fortify-ts/rate-limit": "^0.3.0",
+    "@fortify-ts/bulkhead": "^0.2.0",
+    "@fortify-ts/fallback": "^0.2.0"
   },
   "peerDependenciesMeta": {
     "@fortify-ts/timeout": {
