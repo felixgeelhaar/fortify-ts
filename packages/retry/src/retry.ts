@@ -6,6 +6,7 @@ import {
   sleep,
   type FortifyLogger,
   noopLogger,
+  NEVER_ABORTED_SIGNAL,
 } from '@fortify-ts/core';
 import { type RetryConfig, type RetryConfigInputFull, parseRetryConfig } from './config.js';
 import { getRetryDelay } from './backoff.js';
@@ -74,16 +75,19 @@ export class Retry<T> implements Pattern<T> {
           maxAttempts: this.config.maxAttempts,
         });
 
-        const result = await operation(signal ?? new AbortController().signal);
+        const result = await operation(signal ?? NEVER_ABORTED_SIGNAL);
 
         this.logger.debug('Operation succeeded', { attempt });
         return result;
       } catch (error) {
-        if (!(error instanceof Error)) {
-          throw error;
-        }
+        // Wrap non-Error throws to ensure consistent error handling
+        // This allows retry logic to work even with throw "string" or throw 123
+        const wrappedError =
+          error instanceof Error
+            ? error
+            : new Error(typeof error === 'string' ? error : JSON.stringify(error));
 
-        lastError = error;
+        lastError = wrappedError;
 
         // Check if cancelled during operation
         if (signal?.aborted) {
@@ -94,16 +98,16 @@ export class Retry<T> implements Pattern<T> {
         if (attempt >= this.config.maxAttempts) {
           this.logger.warn('All retry attempts exhausted', {
             attempts: attempt,
-            error: error.message,
+            error: wrappedError.message,
           });
           break;
         }
 
         // Check if error is retryable
-        if (!this.shouldRetry(error)) {
+        if (!this.shouldRetry(wrappedError)) {
           this.logger.info('Error is not retryable, giving up', {
             attempt,
-            error: error.message,
+            error: wrappedError.message,
           });
           break;
         }
@@ -121,11 +125,11 @@ export class Retry<T> implements Pattern<T> {
           attempt,
           nextAttempt: attempt + 1,
           delayMs: delay,
-          error: error.message,
+          error: wrappedError.message,
         });
 
         // Call onRetry callback
-        this.safeCallOnRetry(attempt, error);
+        this.safeCallOnRetry(attempt, wrappedError);
 
         // Wait before retrying
         try {

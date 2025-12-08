@@ -20,3 +20,18 @@ export {
   noopLogger,
   createNoopLogger,
 } from './noop.js';
+
+export {
+  type RedactionConfig,
+  type ParsedRedactionConfig,
+  redactionConfigSchema,
+  DEFAULT_SENSITIVE_KEYS,
+  DEFAULT_SENSITIVE_PATTERNS,
+  redactContext,
+  createRedactor,
+  createDefaultRedactor,
+  withRedaction,
+  withDefaultRedaction,
+  validateRedactionConfig,
+  safeValidateRedactionConfig,
+} from './redaction.js';

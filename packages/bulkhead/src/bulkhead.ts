@@ -2,9 +2,12 @@ import {
   type Operation,
   type Pattern,
   type Resettable,
+  type Closeable,
   BulkheadFullError,
+  BulkheadClosedError,
   type FortifyLogger,
   noopLogger,
+  NEVER_ABORTED_SIGNAL,
 } from '@fortify-ts/core';
 import {
   type BulkheadConfig,
@@ -35,7 +38,7 @@ import { Semaphore } from './semaphore.js';
  * });
  * ```
  */
-export class Bulkhead<T> implements Pattern<T>, Resettable {
+export class Bulkhead<T> implements Pattern<T>, Resettable, Closeable {
   private readonly config: BulkheadConfig;
   private readonly logger: FortifyLogger;
   private readonly semaphore: Semaphore;
@@ -73,9 +76,9 @@ export class Bulkhead<T> implements Pattern<T>, Resettable {
    * @throws {DOMException} When cancelled via signal (AbortError)
    */
   async execute(operation: Operation<T>, signal?: AbortSignal): Promise<T> {
-    // Check if closed
+    // Check if closed - use specific closed error, not full error
     if (this.closed) {
-      throw this.createFullError('Bulkhead is closed');
+      throw new BulkheadClosedError('Bulkhead is closed');
     }
 
     // Check if cancelled
@@ -108,15 +111,20 @@ export class Bulkhead<T> implements Pattern<T>, Resettable {
 
   /**
    * Close the bulkhead, rejecting all pending requests.
+   *
+   * @returns Promise that resolves immediately (sync cleanup)
    */
-  close(): void {
-    if (this.closed) return;
+  close(): Promise<void> {
+    if (this.closed) {
+      return Promise.resolve();
+    }
 
     this.closed = true;
-    const closeError = this.createFullError('Bulkhead closed');
+    const closeError = new BulkheadClosedError('Bulkhead closed');
     this.semaphore.rejectAll(closeError);
     this.queueSemaphore?.rejectAll(closeError);
     this.logger.info('Bulkhead closed');
+    return Promise.resolve();
   }
 
   /**
@@ -135,7 +143,7 @@ export class Bulkhead<T> implements Pattern<T>, Resettable {
     signal?: AbortSignal
   ): Promise<T> {
     try {
-      return await operation(signal ?? new AbortController().signal);
+      return await operation(signal ?? NEVER_ABORTED_SIGNAL);
     } finally {
       this.semaphore.release();
     }

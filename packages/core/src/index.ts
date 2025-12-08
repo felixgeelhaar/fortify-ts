@@ -33,6 +33,7 @@ export {
 
 // Utilities
 export {
+  NEVER_ABORTED_SIGNAL,
   sleep,
   withTimeout,
   executeWithTimeout,
@@ -41,6 +42,7 @@ export {
   throwIfAborted,
   safeCallback,
   addJitter,
+  type JitterMode,
   clamp,
   now,
 } from './utils.js';

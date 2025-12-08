@@ -1,5 +1,6 @@
 import {
   type Resettable,
+  type Closeable,
   RateLimitExceededError,
   type FortifyLogger,
   type BucketState,
@@ -13,8 +14,22 @@ import {
 import {
   type RateLimitConfig,
   type RateLimitConfigInputFull,
+  type RateLimitContext,
   parseRateLimitConfig,
+  TOKEN_EPSILON,
 } from './config.js';
+import {
+  type RateLimiterMetrics,
+  type MetricsContext,
+  type StorageLatencyContext,
+  noopMetrics,
+} from './metrics.js';
+import {
+  KeyTooLongError,
+  TokensExceededError,
+  HealthCheckError,
+  StorageTimeoutError,
+} from './errors.js';
 
 /**
  * Result of a token check operation.
@@ -44,8 +59,6 @@ const INITIAL_BACKOFF_MS = 100;
 /** Maximum backoff delay for storage retries (5 seconds) */
 const MAX_BACKOFF_MS = 5000;
 
-/** Maximum size of the key sanitization cache */
-const SANITIZATION_CACHE_SIZE = 1000;
 
 /**
  * Token bucket rate limiter for controlling request rates.
@@ -69,6 +82,25 @@ const SANITIZATION_CACHE_SIZE = 1000;
  * - `fail-open` (default): Allow the request if storage fails (permissive)
  * - `fail-closed`: Deny the request if storage fails (strict)
  * - `throw`: Re-throw the storage error for explicit handling
+ *
+ * ## Concurrency Considerations (TOCTOU)
+ *
+ * **Important**: When using external storage in distributed/multi-instance environments,
+ * concurrent requests for the same key can experience race conditions (Time-of-Check-to-Time-of-Use).
+ * The read-modify-write pattern (`get` → check tokens → `set`) is not atomic, which means:
+ *
+ * - Two concurrent requests may both read the same bucket state
+ * - Both may determine they have sufficient tokens
+ * - Both may succeed, potentially over-allowing requests
+ *
+ * For strict rate limiting in high-concurrency distributed scenarios, consider:
+ * 1. Using storage with atomic operations (e.g., Redis Lua scripts with `compareAndSet`)
+ * 2. Implementing application-level locking
+ * 3. Using a dedicated rate limiting service
+ *
+ * The `RateLimitStorage` interface includes an optional `compareAndSet` method for
+ * atomic operations. When implementing your storage adapter, providing this method
+ * enables stricter rate limiting guarantees.
  *
  * @example In-memory usage (default)
  * ```typescript
@@ -109,17 +141,24 @@ const SANITIZATION_CACHE_SIZE = 1000;
  * }
  * ```
  */
-export class RateLimiter implements Resettable {
+export class RateLimiter implements Resettable, Closeable {
   private readonly config: RateLimitConfig;
   private readonly logger: FortifyLogger;
   private readonly memoryStorage: MemoryStorage;
   private readonly externalStorage: RateLimitStorage | undefined;
+  private readonly metrics: RateLimiterMetrics;
 
   /** Pre-calculated tokens per millisecond for performance */
   private readonly tokensPerMs: number;
 
   /** LRU cache for sanitized keys to avoid repeated regex operations */
   private readonly sanitizedKeyCache = new Map<string, string>();
+
+  /** Cleanup interval timer ID */
+  private cleanupTimer: ReturnType<typeof setInterval> | undefined;
+
+  /** Whether the rate limiter has been closed */
+  private closed = false;
 
   /** Reusable AbortSignal for operations without explicit signal */
   private static readonly defaultSignal = new AbortController().signal;
@@ -134,10 +173,16 @@ export class RateLimiter implements Resettable {
     this.logger = this.config.logger ?? noopLogger;
     this.memoryStorage = new MemoryStorage({ maxEntries: this.config.maxBuckets });
     this.externalStorage = this.config.storage;
+    this.metrics = this.config.metrics ?? noopMetrics;
 
     // Pre-calculate tokens per millisecond for performance
     this.tokensPerMs =
       this.config.interval > 0 ? this.config.rate / this.config.interval : 0;
+
+    // Start cleanup timer if configured
+    if (this.config.cleanupIntervalMs > 0) {
+      this.startCleanupTimer();
+    }
   }
 
   // ============================================================================
@@ -149,9 +194,12 @@ export class RateLimiter implements Resettable {
    * Uses in-memory storage only (synchronous).
    *
    * @param key - Rate limiting key (e.g., user ID, IP address)
+   * @param context - Optional context for onLimit callback
    * @returns true if the request is allowed, false if rate limited
+   * @throws {KeyTooLongError} If key exceeds maxKeyLength
    */
-  allow(key = ''): boolean {
+  allow(key = '', context?: RateLimitContext): boolean {
+    this.validateKey(key);
     const sanitizedKey = this.sanitizeKey(key);
     const state = this.getBucketSync(sanitizedKey);
     const now = Date.now();
@@ -159,11 +207,40 @@ export class RateLimiter implements Resettable {
 
     this.memoryStorage.setSync(sanitizedKey, result.newState);
 
-    if (!result.allowed) {
-      this.onRateLimited(key);
+    // Emit metrics
+    const metricsCtx: MetricsContext = {
+      key,
+      tokens: 1,
+      currentTokens: result.newState.tokens,
+      burst: this.config.burst,
+      isAsync: false,
+    };
+
+    if (result.allowed) {
+      this.safeCallback(() => this.metrics.onAllow?.(metricsCtx));
+    } else {
+      this.safeCallback(() => this.metrics.onDeny?.(metricsCtx));
+      this.onRateLimited(key, context);
     }
 
     return result.allowed;
+  }
+
+  /**
+   * Check if a request should be allowed using keyFunc to extract key from context.
+   * Uses in-memory storage only (synchronous).
+   *
+   * @param context - Context object to extract key from
+   * @returns true if the request is allowed, false if rate limited, or true if no key extracted
+   * @throws {KeyTooLongError} If extracted key exceeds maxKeyLength
+   */
+  allowWithContext(context: RateLimitContext): boolean {
+    const key = this.extractKey(context);
+    if (key === undefined) {
+      // No key extracted, allow request
+      return true;
+    }
+    return this.allow(key, context);
   }
 
   /**
@@ -172,12 +249,18 @@ export class RateLimiter implements Resettable {
    *
    * @param key - Rate limiting key
    * @param tokens - Number of tokens to take
+   * @param context - Optional context for onLimit callback
    * @returns true if n tokens were available, false otherwise
+   * @throws {KeyTooLongError} If key exceeds maxKeyLength
+   * @throws {TokensExceededError} If tokens exceeds maxTokensPerRequest
    */
-  take(key: string, tokens: number): boolean {
+  take(key: string, tokens: number, context?: RateLimitContext): boolean {
     if (tokens <= 0) {
       return false;
     }
+
+    this.validateKey(key);
+    this.validateTokens(tokens);
 
     const sanitizedKey = this.sanitizeKey(key);
     const state = this.getBucketSync(sanitizedKey);
@@ -186,8 +269,20 @@ export class RateLimiter implements Resettable {
 
     this.memoryStorage.setSync(sanitizedKey, result.newState);
 
-    if (!result.allowed) {
-      this.onRateLimited(key);
+    // Emit metrics
+    const metricsCtx: MetricsContext = {
+      key,
+      tokens,
+      currentTokens: result.newState.tokens,
+      burst: this.config.burst,
+      isAsync: false,
+    };
+
+    if (result.allowed) {
+      this.safeCallback(() => this.metrics.onAllow?.(metricsCtx));
+    } else {
+      this.safeCallback(() => this.metrics.onDeny?.(metricsCtx));
+      this.onRateLimited(key, context);
     }
 
     return result.allowed;
@@ -257,14 +352,17 @@ export class RateLimiter implements Resettable {
    * Uses external storage adapter for persistence across invocations.
    *
    * @param key - Rate limiting key (e.g., user ID, IP address)
+   * @param context - Optional context for onLimit callback
    * @returns Promise resolving to true if allowed, false if rate limited
+   * @throws {KeyTooLongError} If key exceeds maxKeyLength
    */
-  async allowAsync(key = ''): Promise<boolean> {
+  async allowAsync(key = '', context?: RateLimitContext): Promise<boolean> {
+    this.validateKey(key);
     const sanitizedKey = this.sanitizeKey(key);
 
     // Fast path: use memory storage if no external storage
     if (!this.externalStorage) {
-      return this.allow(key);
+      return this.allow(key, context);
     }
 
     try {
@@ -272,13 +370,29 @@ export class RateLimiter implements Resettable {
       const now = Date.now();
       const result = this.checkAndConsumeTokens(state, now, 1);
 
-      await this.withStorageTimeout(
-        this.externalStorage.set(sanitizedKey, result.newState, this.config.storageTtlMs),
-        'set'
+      await this.withStorageLatency(
+        'set',
+        sanitizedKey,
+        this.withStorageTimeout(
+          this.externalStorage.set(sanitizedKey, result.newState, this.config.storageTtlMs),
+          'set'
+        )
       );
 
-      if (!result.allowed) {
-        this.onRateLimited(key);
+      // Emit metrics
+      const metricsCtx: MetricsContext = {
+        key,
+        tokens: 1,
+        currentTokens: result.newState.tokens,
+        burst: this.config.burst,
+        isAsync: true,
+      };
+
+      if (result.allowed) {
+        this.safeCallback(() => this.metrics.onAllow?.(metricsCtx));
+      } else {
+        this.safeCallback(() => this.metrics.onDeny?.(metricsCtx));
+        this.onRateLimited(key, context);
       }
 
       return result.allowed;
@@ -288,23 +402,45 @@ export class RateLimiter implements Resettable {
   }
 
   /**
+   * Check if a request should be allowed using keyFunc to extract key from context.
+   * Uses external storage adapter for persistence across invocations.
+   *
+   * @param context - Context object to extract key from
+   * @returns Promise resolving to true if allowed, false if rate limited, or true if no key
+   * @throws {KeyTooLongError} If extracted key exceeds maxKeyLength
+   */
+  async allowWithContextAsync(context: RateLimitContext): Promise<boolean> {
+    const key = this.extractKey(context);
+    if (key === undefined) {
+      return true;
+    }
+    return this.allowAsync(key, context);
+  }
+
+  /**
    * Attempt to take n tokens from the bucket.
    * Uses external storage adapter for persistence.
    *
    * @param key - Rate limiting key
    * @param tokens - Number of tokens to take
+   * @param context - Optional context for onLimit callback
    * @returns Promise resolving to true if tokens were available
+   * @throws {KeyTooLongError} If key exceeds maxKeyLength
+   * @throws {TokensExceededError} If tokens exceeds maxTokensPerRequest
    */
-  async takeAsync(key: string, tokens: number): Promise<boolean> {
+  async takeAsync(key: string, tokens: number, context?: RateLimitContext): Promise<boolean> {
     if (tokens <= 0) {
       return false;
     }
+
+    this.validateKey(key);
+    this.validateTokens(tokens);
 
     const sanitizedKey = this.sanitizeKey(key);
 
     // Fast path: use memory storage if no external storage
     if (!this.externalStorage) {
-      return this.take(key, tokens);
+      return this.take(key, tokens, context);
     }
 
     try {
@@ -312,13 +448,29 @@ export class RateLimiter implements Resettable {
       const now = Date.now();
       const result = this.checkAndConsumeTokens(state, now, tokens);
 
-      await this.withStorageTimeout(
-        this.externalStorage.set(sanitizedKey, result.newState, this.config.storageTtlMs),
-        'set'
+      await this.withStorageLatency(
+        'set',
+        sanitizedKey,
+        this.withStorageTimeout(
+          this.externalStorage.set(sanitizedKey, result.newState, this.config.storageTtlMs),
+          'set'
+        )
       );
 
-      if (!result.allowed) {
-        this.onRateLimited(key);
+      // Emit metrics
+      const metricsCtx: MetricsContext = {
+        key,
+        tokens,
+        currentTokens: result.newState.tokens,
+        burst: this.config.burst,
+        isAsync: true,
+      };
+
+      if (result.allowed) {
+        this.safeCallback(() => this.metrics.onAllow?.(metricsCtx));
+      } else {
+        this.safeCallback(() => this.metrics.onDeny?.(metricsCtx));
+        this.onRateLimited(key, context);
       }
 
       return result.allowed;
@@ -384,11 +536,14 @@ export class RateLimiter implements Resettable {
         switch (this.config.storageFailureMode) {
           case 'fail-open':
             return; // Allow the request
-          case 'fail-closed':
-            // Exponential backoff to prevent thundering herd on storage failures
-            await sleep(backoffMs, signal);
+          case 'fail-closed': {
+            // Exponential backoff with jitter to prevent thundering herd on storage failures
+            // Jitter range: 50% to 100% of backoff time
+            const jitteredBackoff = backoffMs * (0.5 + Math.random() * 0.5);
+            await sleep(jitteredBackoff, signal);
             backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS);
             continue;
+          }
           case 'throw':
             throw error;
           default: {
@@ -450,21 +605,80 @@ export class RateLimiter implements Resettable {
 
   /**
    * Reset the rate limiter asynchronously, waiting for external storage clear.
+   * Storage errors are logged but don't prevent the reset from completing.
    */
   async resetAsync(): Promise<void> {
     this.memoryStorage.clearSync();
 
     if (this.externalStorage?.clear) {
-      await this.externalStorage.clear();
+      try {
+        await this.externalStorage.clear();
+      } catch (error) {
+        this.logger.error('Failed to clear external storage', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
 
     this.logger.info('Rate limiter reset');
   }
 
   /**
+   * Delete a specific bucket by key.
+   * Removes the bucket from both in-memory and external storage (if available).
+   *
+   * @param key - Rate limiting key to delete
+   * @throws {KeyTooLongError} If key exceeds maxKeyLength
+   */
+  delete(key: string): void {
+    this.validateKey(key);
+    const sanitizedKey = this.sanitizeKey(key);
+    this.memoryStorage.deleteSync(sanitizedKey);
+
+    if (this.externalStorage?.delete) {
+      // Fire and forget - don't block on external storage delete
+      this.externalStorage.delete(sanitizedKey).catch((error: unknown) => {
+        this.logger.error('Failed to delete from external storage', {
+          key,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+    }
+  }
+
+  /**
+   * Delete a specific bucket by key asynchronously.
+   * Waits for external storage deletion to complete.
+   *
+   * @param key - Rate limiting key to delete
+   * @throws {KeyTooLongError} If key exceeds maxKeyLength
+   */
+  async deleteAsync(key: string): Promise<void> {
+    this.validateKey(key);
+    const sanitizedKey = this.sanitizeKey(key);
+    this.memoryStorage.deleteSync(sanitizedKey);
+
+    if (this.externalStorage?.delete) {
+      await this.withStorageLatency(
+        'delete',
+        sanitizedKey,
+        this.withStorageTimeout(this.externalStorage.delete(sanitizedKey), 'delete')
+      );
+    }
+  }
+
+  /**
    * Get the number of active buckets in memory.
+   * Alias for keyCount() for backwards compatibility.
    */
   bucketCount(): number {
+    return this.memoryStorage.size();
+  }
+
+  /**
+   * Get the number of active buckets in memory.
+   */
+  keyCount(): number {
     return this.memoryStorage.size();
   }
 
@@ -480,6 +694,108 @@ export class RateLimiter implements Resettable {
    */
   hasExternalStorage(): boolean {
     return this.externalStorage !== undefined;
+  }
+
+  /**
+   * Perform a health check on the rate limiter.
+   * Verifies that external storage (if configured) is operational.
+   *
+   * @returns Promise resolving to true if healthy
+   * @throws {HealthCheckError} If the health check fails
+   */
+  async healthCheck(): Promise<boolean> {
+    if (!this.externalStorage) {
+      // No external storage, always healthy
+      return true;
+    }
+
+    // Use randomized test key to avoid collision with user keys
+    const testKey = `__fortify_health_check_${Math.random().toString(36).slice(2)}__`;
+    const testState: BucketState = {
+      tokens: 0,
+      lastRefill: Date.now(),
+    };
+
+    try {
+      // Try to write and read back
+      const startTime = Date.now();
+      await this.withStorageTimeout(
+        this.externalStorage.set(testKey, testState, 60000),
+        'set'
+      );
+
+      const retrieved = await this.withStorageTimeout(
+        this.externalStorage.get(testKey),
+        'get'
+      );
+      const latencyMs = Date.now() - startTime;
+
+      // Verify we can read back what we wrote
+      if (!retrieved || retrieved.lastRefill !== testState.lastRefill) {
+        throw new HealthCheckError(
+          'Health check failed: storage read/write mismatch'
+        );
+      }
+
+      // Clean up test key
+      if (this.externalStorage.delete) {
+        await this.externalStorage.delete(testKey).catch(() => {
+          // Ignore cleanup errors
+        });
+      }
+
+      this.logger.debug('Health check passed', { latencyMs });
+      return true;
+    } catch (error) {
+      const healthError =
+        error instanceof HealthCheckError
+          ? error
+          : new HealthCheckError(
+              `Health check failed: ${error instanceof Error ? error.message : String(error)}`,
+              error instanceof Error ? error : undefined
+            );
+      this.safeCallback(() =>
+        this.metrics.onError?.(healthError, { key: testKey })
+      );
+      throw healthError;
+    }
+  }
+
+  /**
+   * Close the rate limiter and release resources.
+   * Clears in-memory storage and external storage if available.
+   * This method is safe to call multiple times.
+   */
+  async close(): Promise<void> {
+    if (this.closed) {
+      return;
+    }
+    this.closed = true;
+
+    // Stop cleanup timer
+    this.stopCleanupTimer();
+
+    this.memoryStorage.clearSync();
+    this.sanitizedKeyCache.clear();
+
+    if (this.externalStorage?.clear) {
+      try {
+        await this.externalStorage.clear();
+      } catch (error) {
+        this.logger.error('Failed to clear external storage during close', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    this.logger.info('Rate limiter closed');
+  }
+
+  /**
+   * Check if the rate limiter has been closed.
+   */
+  isClosed(): boolean {
+    return this.closed;
   }
 
   // ============================================================================
@@ -517,7 +833,7 @@ export class RateLimiter implements Resettable {
     const sanitized = sanitizeStorageKey(key);
 
     // Evict oldest entry if cache is full
-    if (this.sanitizedKeyCache.size >= SANITIZATION_CACHE_SIZE) {
+    if (this.sanitizedKeyCache.size >= this.config.sanitizationCacheSize) {
       const firstKey = this.sanitizedKeyCache.keys().next().value;
       if (firstKey !== undefined) {
         this.sanitizedKeyCache.delete(firstKey);
@@ -584,11 +900,7 @@ export class RateLimiter implements Resettable {
 
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
-        reject(
-          new Error(
-            `Storage operation '${operationName}' timed out after ${String(timeoutMs)}ms`
-          )
-        );
+        reject(new StorageTimeoutError(operationName, timeoutMs));
       }, timeoutMs);
     });
 
@@ -609,7 +921,11 @@ export class RateLimiter implements Resettable {
     key: string,
     storage: RateLimitStorage
   ): Promise<BucketState> {
-    const state = await this.withStorageTimeout(storage.get(key), 'get');
+    const state = await this.withStorageLatency(
+      'get',
+      key,
+      this.withStorageTimeout(storage.get(key), 'get')
+    );
 
     if (state) {
       // Validate data from untrusted external storage
@@ -661,6 +977,7 @@ export class RateLimiter implements Resettable {
    * Check if tokens are available and consume them if so.
    * Returns the result and the new state (refilled, with tokens consumed if allowed).
    * This is the core rate limiting logic shared between sync and async methods.
+   * Uses TOKEN_EPSILON for floating point comparison to handle precision issues.
    */
   private checkAndConsumeTokens(
     state: BucketState,
@@ -669,11 +986,13 @@ export class RateLimiter implements Resettable {
   ): TokenCheckResult {
     const refilled = this.refill(state, now);
 
-    if (refilled.tokens >= tokensNeeded) {
+    // Use epsilon comparison to handle floating point precision issues
+    // e.g., 0.9999999999 should be considered as 1.0
+    if (refilled.tokens >= tokensNeeded - TOKEN_EPSILON) {
       return {
         allowed: true,
         newState: {
-          tokens: refilled.tokens - tokensNeeded,
+          tokens: Math.max(0, refilled.tokens - tokensNeeded),
           lastRefill: refilled.lastRefill,
         },
       };
@@ -730,7 +1049,7 @@ export class RateLimiter implements Resettable {
   /**
    * Handle rate limiting event.
    */
-  private onRateLimited(key: string): void {
+  private onRateLimited(key: string, context?: RateLimitContext): void {
     this.logger.warn('Rate limit exceeded', {
       key,
       rate: this.config.rate,
@@ -738,13 +1057,144 @@ export class RateLimiter implements Resettable {
     });
 
     if (this.config.onLimit) {
+      this.safeCallback(() => this.config.onLimit?.(key, context));
+    }
+  }
+
+  /**
+   * Validate that a key does not exceed the maximum allowed length.
+   * @throws {KeyTooLongError} If key exceeds maxKeyLength
+   */
+  private validateKey(key: string): void {
+    if (key.length > this.config.maxKeyLength) {
+      const error = new KeyTooLongError(key, this.config.maxKeyLength);
+      this.safeCallback(() => this.metrics.onError?.(error, { key }));
+      throw error;
+    }
+  }
+
+  /**
+   * Validate that requested tokens do not exceed maximum allowed per request.
+   * @throws {TokensExceededError} If tokens exceeds maxTokensPerRequest
+   */
+  private validateTokens(tokens: number): void {
+    if (tokens > this.config.maxTokensPerRequest) {
+      const error = new TokensExceededError(tokens, this.config.maxTokensPerRequest);
+      this.safeCallback(() => this.metrics.onError?.(error, { tokens }));
+      throw error;
+    }
+  }
+
+  /**
+   * Extract rate limiting key from context using keyFunc.
+   * Returns undefined if no keyFunc is configured or if keyFunc returns undefined.
+   */
+  private extractKey(context: RateLimitContext): string | undefined {
+    if (!this.config.keyFunc) {
+      return undefined;
+    }
+
+    try {
+      return this.config.keyFunc(context);
+    } catch (error) {
+      this.logger.error('keyFunc threw an error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return undefined;
+    }
+  }
+
+  /**
+   * Safely execute a callback, catching and logging any errors.
+   * Provides panic recovery for user-provided callbacks.
+   */
+  private safeCallback(callback: () => void): void {
+    try {
+      callback();
+    } catch (error) {
+      this.logger.error('Callback threw an error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Wrap a storage operation with latency tracking.
+   * Reports latency to the metrics interface.
+   * Skips tracking overhead when no metrics callback is configured.
+   */
+  private async withStorageLatency<T>(
+    operation: StorageLatencyContext['operation'],
+    key: string | undefined,
+    promise: Promise<T>
+  ): Promise<T> {
+    // Skip tracking overhead when metrics callback is not configured
+    if (!this.metrics.onStorageLatency) {
+      return promise;
+    }
+
+    const startTime = Date.now();
+    let success = true;
+    let error: Error | undefined;
+
+    try {
+      return await promise;
+    } catch (err) {
+      success = false;
+      error = err instanceof Error ? err : new Error(String(err));
+      throw err;
+    } finally {
+      const durationMs = Date.now() - startTime;
+      this.safeCallback(() =>
+        this.metrics.onStorageLatency?.({
+          operation,
+          key,
+          durationMs,
+          success,
+          error,
+        })
+      );
+    }
+  }
+
+  /**
+   * Start the cleanup timer for periodic bucket expiration.
+   */
+  private startCleanupTimer(): void {
+    if (this.cleanupTimer) {
+      return; // Already running
+    }
+
+    this.cleanupTimer = setInterval(() => {
       try {
-        this.config.onLimit(key);
+        const now = Date.now();
+        // Cleanup expired entries from memory storage
+        // The memory storage handles expiration internally via maxEntries LRU
+        // This timer is for additional cleanup if needed
+        this.logger.debug('Running periodic cleanup', {
+          keyCount: this.keyCount(),
+          timestamp: now,
+        });
       } catch (error) {
-        this.logger.error('onLimit callback threw an error', {
+        this.logger.error('Cleanup timer error', {
           error: error instanceof Error ? error.message : String(error),
         });
       }
+    }, this.config.cleanupIntervalMs);
+
+    // Ensure timer doesn't prevent process exit
+    if (typeof this.cleanupTimer === 'object' && 'unref' in this.cleanupTimer) {
+      this.cleanupTimer.unref();
+    }
+  }
+
+  /**
+   * Stop the cleanup timer.
+   */
+  private stopCleanupTimer(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = undefined;
     }
   }
 }

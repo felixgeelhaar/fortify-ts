@@ -1,12 +1,15 @@
 import { z } from 'zod';
 import { type FortifyLogger } from '@fortify-ts/core';
 
+/** Maximum allowed timeout in milliseconds (1 hour) */
+const MAX_TIMEOUT_MS = 3_600_000;
+
 /**
  * Zod schema for Timeout configuration.
  */
 export const timeoutConfigSchema = z.object({
-  /** Default timeout in milliseconds (default: 30000) */
-  defaultTimeout: z.number().int().positive().default(30000),
+  /** Default timeout in milliseconds (default: 30000, max: 1 hour) */
+  defaultTimeout: z.number().int().positive().max(MAX_TIMEOUT_MS).default(30000),
   /** Callback when timeout occurs */
   onTimeout: z.function().optional(),
 });

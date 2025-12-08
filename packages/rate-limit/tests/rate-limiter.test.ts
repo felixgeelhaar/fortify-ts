@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { RateLimiter } from '../src/rate-limiter.js';
 import { TokenBucket } from '../src/token-bucket.js';
+import { KeyTooLongError } from '../src/errors.js';
 import {
   RateLimitExceededError,
   type RateLimitStorage,
@@ -329,7 +330,8 @@ describe('RateLimiter', () => {
       expect(onLimit).not.toHaveBeenCalled();
 
       limiter.allow('test-key');
-      expect(onLimit).toHaveBeenCalledWith('test-key');
+      // onLimit is called with key and optional context
+      expect(onLimit).toHaveBeenCalledWith('test-key', undefined);
     });
 
     it('should handle errors in onLimit gracefully', () => {
@@ -663,6 +665,45 @@ describe('RateLimiter', () => {
 
         expect(storage.store.size).toBe(0);
       });
+
+      it('should handle external storage clear failure gracefully', async () => {
+        const errorLogs: Array<{ message: string; context: unknown }> = [];
+        const mockLogger = {
+          debug: vi.fn(),
+          info: vi.fn(),
+          warn: vi.fn(),
+          error: vi.fn((message: string, context: unknown) => {
+            errorLogs.push({ message, context });
+          }),
+        };
+
+        const storage: RateLimitStorage = {
+          async get(): Promise<BucketState | null> {
+            return null;
+          },
+          async set(): Promise<void> {},
+          async clear(): Promise<void> {
+            throw new Error('Storage clear failed');
+          },
+        };
+
+        const limiter = new RateLimiter({
+          rate: 10,
+          storage,
+          logger: mockLogger,
+        });
+
+        // resetAsync should not throw even when storage.clear fails
+        await expect(limiter.resetAsync()).resolves.toBeUndefined();
+
+        // Error should be logged
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          'Failed to clear external storage',
+          expect.objectContaining({
+            error: 'Storage clear failed',
+          })
+        );
+      });
     });
 
     describe('using MemoryStorage explicitly', () => {
@@ -858,13 +899,331 @@ describe('RateLimiter', () => {
       expect(limiter.allow('userwithnullbytes')).toBe(false);
     });
 
-    it('should truncate long keys', () => {
+    it('should throw KeyTooLongError for keys exceeding maxKeyLength', () => {
       const limiter = new RateLimiter({ rate: 10, burst: 2 });
       const longKey = 'a'.repeat(500);
 
-      expect(limiter.allow(longKey)).toBe(true);
-      expect(limiter.allow('a'.repeat(256))).toBe(true); // Truncated to same
+      // Default maxKeyLength is 256, so keys longer than that throw
+      expect(() => limiter.allow(longKey)).toThrow(KeyTooLongError);
+
+      // Keys exactly at maxKeyLength should work
+      expect(limiter.allow('a'.repeat(256))).toBe(true);
+      expect(limiter.allow('a'.repeat(256))).toBe(true);
       expect(limiter.allow('a'.repeat(256))).toBe(false);
+    });
+
+    it('should allow configuring maxKeyLength', () => {
+      const limiter = new RateLimiter({ rate: 10, burst: 2, maxKeyLength: 100 });
+      const longKey = 'a'.repeat(150);
+
+      expect(() => limiter.allow(longKey)).toThrow(KeyTooLongError);
+      expect(limiter.allow('a'.repeat(100))).toBe(true); // Exactly at limit
+    });
+  });
+
+  describe('metrics', () => {
+    it('should call onAllow when request is allowed', () => {
+      const onAllow = vi.fn();
+      const limiter = new RateLimiter({
+        rate: 10,
+        burst: 2,
+        metrics: { onAllow },
+      });
+
+      limiter.allow('test-key');
+      expect(onAllow).toHaveBeenCalledWith({
+        key: 'test-key',
+        tokens: 1,
+        currentTokens: 1,
+        burst: 2,
+        isAsync: false,
+      });
+    });
+
+    it('should call onDeny when request is denied', () => {
+      const onDeny = vi.fn();
+      const limiter = new RateLimiter({
+        rate: 10,
+        burst: 1,
+        metrics: { onDeny },
+      });
+
+      limiter.allow('test-key');
+      limiter.allow('test-key');
+
+      expect(onDeny).toHaveBeenCalledWith(
+        expect.objectContaining({
+          key: 'test-key',
+          tokens: 1,
+          burst: 1,
+          isAsync: false,
+        })
+      );
+    });
+
+    it('should call onError when error occurs', () => {
+      const onError = vi.fn();
+      const limiter = new RateLimiter({
+        rate: 10,
+        burst: 2,
+        maxKeyLength: 10,
+        metrics: { onError },
+      });
+
+      expect(() => limiter.allow('a'.repeat(20))).toThrow(KeyTooLongError);
+      expect(onError).toHaveBeenCalled();
+    });
+
+    it('should handle errors in metrics callbacks gracefully', () => {
+      const onAllow = vi.fn().mockImplementation(() => {
+        throw new Error('metrics error');
+      });
+      const limiter = new RateLimiter({
+        rate: 10,
+        burst: 2,
+        metrics: { onAllow },
+      });
+
+      // Should not throw
+      expect(() => limiter.allow('test-key')).not.toThrow();
+    });
+  });
+
+  describe('keyFunc', () => {
+    it('should extract key from context using keyFunc', () => {
+      const limiter = new RateLimiter({
+        rate: 10,
+        burst: 1,
+        keyFunc: (ctx) => ctx.userId as string | undefined,
+      });
+
+      expect(limiter.allowWithContext({ userId: 'user-1' })).toBe(true);
+      expect(limiter.allowWithContext({ userId: 'user-1' })).toBe(false);
+      expect(limiter.allowWithContext({ userId: 'user-2' })).toBe(true);
+    });
+
+    it('should allow request when keyFunc returns undefined', () => {
+      const limiter = new RateLimiter({
+        rate: 10,
+        burst: 1,
+        keyFunc: () => undefined,
+      });
+
+      // All requests allowed because no key extracted
+      expect(limiter.allowWithContext({})).toBe(true);
+      expect(limiter.allowWithContext({})).toBe(true);
+      expect(limiter.allowWithContext({})).toBe(true);
+    });
+
+    it('should return true when no keyFunc configured', () => {
+      const limiter = new RateLimiter({ rate: 10, burst: 1 });
+
+      // No keyFunc, always returns true
+      expect(limiter.allowWithContext({})).toBe(true);
+    });
+
+    it('should handle keyFunc errors gracefully', () => {
+      const limiter = new RateLimiter({
+        rate: 10,
+        burst: 1,
+        keyFunc: () => {
+          throw new Error('keyFunc error');
+        },
+      });
+
+      // Should not throw, returns true (no key extracted)
+      expect(() => limiter.allowWithContext({})).not.toThrow();
+      expect(limiter.allowWithContext({})).toBe(true);
+    });
+  });
+
+  describe('maxTokensPerRequest', () => {
+    it('should throw TokensExceededError for excessive token requests', async () => {
+      const { TokensExceededError } = await import('../src/errors.js');
+      const limiter = new RateLimiter({
+        rate: 10,
+        burst: 10,
+        maxTokensPerRequest: 5,
+      });
+
+      expect(() => limiter.take('key', 10)).toThrow(TokensExceededError);
+    });
+
+    it('should allow token requests within limit', () => {
+      const limiter = new RateLimiter({
+        rate: 10,
+        burst: 10,
+        maxTokensPerRequest: 5,
+      });
+
+      expect(limiter.take('key', 5)).toBe(true);
+    });
+
+    it('should use default maxTokensPerRequest of burst * 10', () => {
+      const limiter = new RateLimiter({
+        rate: 10,
+        burst: 10,
+      });
+
+      // Default maxTokensPerRequest is 10 * 10 = 100
+      expect(limiter.take('key', 10)).toBe(true);
+    });
+  });
+
+  describe('delete', () => {
+    it('should delete a bucket by key', () => {
+      const limiter = new RateLimiter({ rate: 10, burst: 2 });
+
+      limiter.allow('key-1');
+      limiter.allow('key-1');
+      expect(limiter.allow('key-1')).toBe(false);
+
+      limiter.delete('key-1');
+
+      // After delete, bucket is reset
+      expect(limiter.allow('key-1')).toBe(true);
+    });
+  });
+
+  describe('keyCount', () => {
+    it('should return the number of active buckets', () => {
+      const limiter = new RateLimiter({ rate: 10, burst: 2 });
+
+      expect(limiter.keyCount()).toBe(0);
+      limiter.allow('key-1');
+      expect(limiter.keyCount()).toBe(1);
+      limiter.allow('key-2');
+      expect(limiter.keyCount()).toBe(2);
+      limiter.allow('key-1'); // Same key
+      expect(limiter.keyCount()).toBe(2);
+    });
+  });
+
+  describe('healthCheck', () => {
+    it('should return true when no external storage', async () => {
+      const limiter = new RateLimiter({ rate: 10, burst: 2 });
+      expect(await limiter.healthCheck()).toBe(true);
+    });
+
+    it('should verify external storage is operational', async () => {
+      // Use a store that tracks set/get operations with randomized keys
+      const store = new Map<string, BucketState>();
+      const storage: RateLimitStorage = {
+        async get(key) {
+          return store.get(key) ?? null;
+        },
+        async set(key, state) {
+          store.set(key, state);
+        },
+        async delete(key) {
+          store.delete(key);
+        },
+      };
+
+      const limiter = new RateLimiter({
+        rate: 10,
+        burst: 2,
+        storage,
+      });
+
+      expect(await limiter.healthCheck()).toBe(true);
+    });
+
+    it('should throw HealthCheckError on storage failure', async () => {
+      const { HealthCheckError } = await import('../src/errors.js');
+      const storage: RateLimitStorage = {
+        async get() {
+          throw new Error('Storage unavailable');
+        },
+        async set() {
+          throw new Error('Storage unavailable');
+        },
+      };
+
+      const limiter = new RateLimiter({
+        rate: 10,
+        burst: 2,
+        storage,
+      });
+
+      await expect(limiter.healthCheck()).rejects.toThrow(HealthCheckError);
+    });
+  });
+
+  describe('isClosed', () => {
+    it('should return false when not closed', () => {
+      const limiter = new RateLimiter({ rate: 10, burst: 2 });
+      expect(limiter.isClosed()).toBe(false);
+    });
+
+    it('should return true after close', async () => {
+      const limiter = new RateLimiter({ rate: 10, burst: 2 });
+      await limiter.close();
+      expect(limiter.isClosed()).toBe(true);
+    });
+  });
+
+  describe('cleanupInterval', () => {
+    it('should accept cleanupIntervalMs configuration', () => {
+      // Should not throw
+      const limiter = new RateLimiter({
+        rate: 10,
+        burst: 2,
+        cleanupIntervalMs: 30000,
+      });
+      expect(limiter).toBeDefined();
+    });
+
+    it('should accept 0 to disable cleanup', () => {
+      const limiter = new RateLimiter({
+        rate: 10,
+        burst: 2,
+        cleanupIntervalMs: 0,
+      });
+      expect(limiter).toBeDefined();
+    });
+
+    it('should handle cleanup timer errors gracefully', async () => {
+      vi.useFakeTimers();
+
+      const errorLogs: Array<{ message: string; context: unknown }> = [];
+      const mockLogger = {
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn((message: string, context: unknown) => {
+          errorLogs.push({ message, context });
+        }),
+      };
+
+      const limiter = new RateLimiter({
+        rate: 10,
+        burst: 5,
+        cleanupIntervalMs: 1000,
+        logger: mockLogger,
+      });
+
+      // Mock keyCount to throw an error during cleanup
+      vi.spyOn(limiter, 'keyCount').mockImplementation(() => {
+        throw new Error('Mock cleanup error');
+      });
+
+      // Advance time to trigger cleanup
+      await vi.advanceTimersByTimeAsync(1000);
+
+      // Verify error was logged
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Cleanup timer error',
+        expect.objectContaining({
+          error: 'Mock cleanup error',
+        })
+      );
+
+      // Limiter should still be usable
+      expect(limiter.allow('test-key')).toBe(true);
+
+      limiter.close();
+      vi.useRealTimers();
     });
   });
 });
@@ -1291,6 +1650,129 @@ describe('Config validation', () => {
         storageTimeoutMs: NaN,
       });
     }).toThrow(/storageTimeoutMs must be between/);
+  });
+
+  it('should reject NaN storageTtlMs', () => {
+    expect(() => {
+      new RateLimiter({
+        rate: 10,
+        storageTtlMs: NaN,
+      });
+    }).toThrow(/storageTtlMs must be between/);
+  });
+
+  it('should reject Infinity storageTtlMs', () => {
+    expect(() => {
+      new RateLimiter({
+        rate: 10,
+        storageTtlMs: Infinity,
+      });
+    }).toThrow(/storageTtlMs must be between/);
+  });
+
+  it('should reject NaN maxKeyLength', () => {
+    expect(() => {
+      new RateLimiter({
+        rate: 10,
+        maxKeyLength: NaN,
+      });
+    }).toThrow(/maxKeyLength must be between/);
+  });
+
+  it('should reject Infinity maxKeyLength', () => {
+    expect(() => {
+      new RateLimiter({
+        rate: 10,
+        maxKeyLength: Infinity,
+      });
+    }).toThrow(/maxKeyLength must be between/);
+  });
+
+  it('should reject NaN cleanupIntervalMs', () => {
+    expect(() => {
+      new RateLimiter({
+        rate: 10,
+        cleanupIntervalMs: NaN,
+      });
+    }).toThrow(/cleanupIntervalMs must be/);
+  });
+
+  it('should reject Infinity cleanupIntervalMs', () => {
+    expect(() => {
+      new RateLimiter({
+        rate: 10,
+        cleanupIntervalMs: Infinity,
+      });
+    }).toThrow(/cleanupIntervalMs must be/);
+  });
+
+  it('should reject NaN maxTokensPerRequest', () => {
+    expect(() => {
+      new RateLimiter({
+        rate: 10,
+        maxTokensPerRequest: NaN,
+      });
+    }).toThrow(/maxTokensPerRequest must be a positive number/);
+  });
+
+  it('should reject Infinity maxTokensPerRequest', () => {
+    expect(() => {
+      new RateLimiter({
+        rate: 10,
+        maxTokensPerRequest: Infinity,
+      });
+    }).toThrow(/maxTokensPerRequest must be a positive number/);
+  });
+
+  it('should reject NaN sanitizationCacheSize', () => {
+    expect(() => {
+      new RateLimiter({
+        rate: 10,
+        sanitizationCacheSize: NaN,
+      });
+    }).toThrow(/sanitizationCacheSize must be between/);
+  });
+
+  it('should reject Infinity sanitizationCacheSize', () => {
+    expect(() => {
+      new RateLimiter({
+        rate: 10,
+        sanitizationCacheSize: Infinity,
+      });
+    }).toThrow(/sanitizationCacheSize must be between/);
+  });
+
+  it('should reject sanitizationCacheSize exceeding maximum (100000)', () => {
+    expect(() => {
+      new RateLimiter({
+        rate: 10,
+        sanitizationCacheSize: 200000,
+      });
+    }).toThrow(/sanitizationCacheSize must be between/);
+  });
+
+  it('should accept valid sanitizationCacheSize', () => {
+    const limiter = new RateLimiter({
+      rate: 10,
+      sanitizationCacheSize: 5000,
+    });
+    expect(limiter).toBeDefined();
+  });
+
+  it('should reject zero rate', () => {
+    expect(() => {
+      new RateLimiter({
+        rate: 0,
+      });
+    }).toThrow(); // Zod validates rate must be positive
+  });
+
+  it('should reject negative rate', () => {
+    expect(() => {
+      new RateLimiter({
+        rate: -10,
+      });
+    }).toThrow(); // Zod validates rate must be positive
   });
 });
 
@@ -1778,6 +2260,364 @@ describe('RateLimitExceededError key inclusion', () => {
       expect(error).toBeInstanceOf(RateLimitExceededError);
       expect((error as RateLimitExceededError).key).toBe('');
     }
+  });
+});
+
+describe('onStorageLatency metrics', () => {
+  it('should call onStorageLatency for get and set operations', async () => {
+    const onStorageLatency = vi.fn();
+    const storage: RateLimitStorage = {
+      store: new Map<string, BucketState>(),
+      async get(key: string): Promise<BucketState | null> {
+        return this.store.get(key) ?? null;
+      },
+      async set(key: string, state: BucketState): Promise<void> {
+        this.store.set(key, state);
+      },
+    };
+
+    const limiter = new RateLimiter({
+      rate: 10,
+      burst: 5,
+      storage,
+      metrics: { onStorageLatency },
+    });
+
+    await limiter.allowAsync('test-key');
+
+    // Should be called for both get and set operations
+    expect(onStorageLatency).toHaveBeenCalledTimes(2);
+
+    // Check the get operation
+    expect(onStorageLatency).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'get',
+        key: 'test-key',
+        success: true,
+        error: undefined,
+      })
+    );
+
+    // Check the set operation
+    expect(onStorageLatency).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'set',
+        key: 'test-key',
+        success: true,
+        error: undefined,
+      })
+    );
+
+    // All calls should have durationMs defined
+    for (const call of onStorageLatency.mock.calls) {
+      expect(call[0].durationMs).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('should report storage errors in onStorageLatency for set failures', async () => {
+    const onStorageLatency = vi.fn();
+    const storage: RateLimitStorage = {
+      async get(): Promise<BucketState | null> {
+        return null; // get succeeds
+      },
+      async set(): Promise<void> {
+        throw new Error('Storage write failed');
+      },
+    };
+
+    const limiter = new RateLimiter({
+      rate: 10,
+      burst: 5,
+      storage,
+      storageFailureMode: 'fail-open',
+      metrics: { onStorageLatency },
+    });
+
+    await limiter.allowAsync('test-key');
+
+    // Should be called for both get (success) and set (failure)
+    expect(onStorageLatency).toHaveBeenCalledTimes(2);
+
+    // Check the successful get operation
+    expect(onStorageLatency).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'get',
+        success: true,
+      })
+    );
+
+    // Check the failed set operation
+    expect(onStorageLatency).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'set',
+        success: false,
+        error: expect.any(Error),
+      })
+    );
+  });
+
+  it('should report storage errors in onStorageLatency for get failures', async () => {
+    const onStorageLatency = vi.fn();
+    const storage: RateLimitStorage = {
+      async get(): Promise<BucketState | null> {
+        throw new Error('Storage read failed');
+      },
+      async set(): Promise<void> {
+        // set would not be called if get fails in fail-open mode
+      },
+    };
+
+    const limiter = new RateLimiter({
+      rate: 10,
+      burst: 5,
+      storage,
+      storageFailureMode: 'fail-open',
+      metrics: { onStorageLatency },
+    });
+
+    await limiter.allowAsync('test-key');
+
+    // Should be called for the failed get operation
+    expect(onStorageLatency).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'get',
+        key: 'test-key',
+        success: false,
+        error: expect.any(Error),
+      })
+    );
+  });
+
+  it('should call onStorageLatency for delete operations', async () => {
+    const onStorageLatency = vi.fn();
+    const storage: RateLimitStorage = {
+      store: new Map<string, BucketState>(),
+      async get(key: string): Promise<BucketState | null> {
+        return this.store.get(key) ?? null;
+      },
+      async set(key: string, state: BucketState): Promise<void> {
+        this.store.set(key, state);
+      },
+      async delete(key: string): Promise<void> {
+        this.store.delete(key);
+      },
+    };
+
+    const limiter = new RateLimiter({
+      rate: 10,
+      burst: 5,
+      storage,
+      metrics: { onStorageLatency },
+    });
+
+    await limiter.deleteAsync('test-key');
+
+    expect(onStorageLatency).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'delete',
+        key: 'test-key',
+        success: true,
+        error: undefined,
+      })
+    );
+  });
+});
+
+describe('deleteAsync with external storage', () => {
+  it('should delete from both memory and external storage', async () => {
+    const storage: RateLimitStorage & { store: Map<string, BucketState> } = {
+      store: new Map<string, BucketState>(),
+      async get(key: string): Promise<BucketState | null> {
+        return this.store.get(key) ?? null;
+      },
+      async set(key: string, state: BucketState): Promise<void> {
+        this.store.set(key, state);
+      },
+      async delete(key: string): Promise<void> {
+        this.store.delete(key);
+      },
+    };
+
+    const limiter = new RateLimiter({
+      rate: 10,
+      burst: 2,
+      storage,
+    });
+
+    // Create a bucket via allowAsync
+    await limiter.allowAsync('test-key');
+    expect(storage.store.has('test-key')).toBe(true);
+
+    // Delete the bucket
+    await limiter.deleteAsync('test-key');
+
+    // Verify deleted from external storage
+    expect(storage.store.has('test-key')).toBe(false);
+
+    // Verify bucket is reset (should get full tokens again)
+    expect(await limiter.allowAsync('test-key')).toBe(true);
+    expect(await limiter.allowAsync('test-key')).toBe(true);
+  });
+
+  it('should handle deleteAsync when storage has no delete method', async () => {
+    const storage: RateLimitStorage = {
+      store: new Map<string, BucketState>(),
+      async get(key: string): Promise<BucketState | null> {
+        return (this as { store: Map<string, BucketState> }).store.get(key) ?? null;
+      },
+      async set(key: string, state: BucketState): Promise<void> {
+        (this as { store: Map<string, BucketState> }).store.set(key, state);
+      },
+      // No delete method
+    };
+
+    const limiter = new RateLimiter({
+      rate: 10,
+      burst: 2,
+      storage,
+    });
+
+    // Should not throw even without delete method
+    await expect(limiter.deleteAsync('test-key')).resolves.toBeUndefined();
+  });
+});
+
+describe('Error types', () => {
+  it('should export StorageUnavailableError', async () => {
+    const { StorageUnavailableError } = await import('../src/errors.js');
+
+    const cause = new Error('Connection refused');
+    const error = new StorageUnavailableError('Redis unavailable', cause);
+
+    expect(error.name).toBe('StorageUnavailableError');
+    expect(error.message).toBe('Redis unavailable');
+    expect(error.cause).toBe(cause);
+  });
+
+  it('should export StorageTimeoutError', async () => {
+    const { StorageTimeoutError } = await import('../src/errors.js');
+
+    const error = new StorageTimeoutError('get', 5000);
+
+    expect(error.name).toBe('StorageTimeoutError');
+    expect(error.message).toContain('get');
+    expect(error.message).toContain('5000');
+    expect(error.operationName).toBe('get');
+    expect(error.timeoutMs).toBe(5000);
+  });
+
+  it('should export InvalidBucketStateError', async () => {
+    const { InvalidBucketStateError } = await import('../src/errors.js');
+
+    const error = new InvalidBucketStateError('user-123', 'Corrupted data');
+
+    expect(error.name).toBe('InvalidBucketStateError');
+    expect(error.message).toBe('Corrupted data');
+    expect(error.key).toBe('user-123');
+  });
+
+  it('should truncate keys in KeyTooLongError for PII protection', async () => {
+    const limiter = new RateLimiter({ rate: 10, maxKeyLength: 10 });
+    const longKey = 'user-email@very-long-domain-that-should-be-truncated.com';
+
+    try {
+      limiter.allow(longKey);
+      expect.fail('Should have thrown KeyTooLongError');
+    } catch (error) {
+      expect(error).toBeInstanceOf(KeyTooLongError);
+      const keyError = error as InstanceType<typeof KeyTooLongError>;
+
+      // keyPreview should be truncated to 20 chars + '...'
+      expect(keyError.keyPreview).toBe('user-email@very-long...');
+      expect(keyError.keyLength).toBe(longKey.length);
+      expect(keyError.maxLength).toBe(10);
+
+      // Full key should NOT be exposed in the error
+      expect(keyError.message).not.toContain(longKey);
+      expect(keyError.message).toContain('user-email@very-long...');
+    }
+  });
+
+  it('should not truncate short keys in KeyTooLongError', async () => {
+    const limiter = new RateLimiter({ rate: 10, maxKeyLength: 5 });
+    const shortKey = 'abcdefghij'; // 10 chars, exceeds 5
+
+    try {
+      limiter.allow(shortKey);
+      expect.fail('Should have thrown KeyTooLongError');
+    } catch (error) {
+      expect(error).toBeInstanceOf(KeyTooLongError);
+      const keyError = error as InstanceType<typeof KeyTooLongError>;
+
+      // 10 chars is <= 20, so no truncation
+      expect(keyError.keyPreview).toBe(shortKey);
+    }
+  });
+
+  it('should export RateLimiterError base class', async () => {
+    const { RateLimiterError } = await import('../src/errors.js');
+
+    const error = new RateLimiterError('Base error');
+    expect(error.name).toBe('RateLimiterError');
+    expect(error.message).toBe('Base error');
+  });
+});
+
+describe('TOKEN_EPSILON floating-point precision', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('should handle floating-point precision issues near token boundary', () => {
+    // Create a limiter where token accumulation can lead to floating point issues
+    const limiter = new RateLimiter({
+      rate: 3, // 3 tokens per second = 0.003 tokens/ms
+      burst: 3,
+      interval: 1000,
+    });
+
+    // Drain all tokens
+    expect(limiter.allow('key')).toBe(true);
+    expect(limiter.allow('key')).toBe(true);
+    expect(limiter.allow('key')).toBe(true);
+    expect(limiter.allow('key')).toBe(false);
+
+    // Advance time to get exactly 1 token back
+    // 1000ms / 3 = 333.333... ms per token
+    // Due to floating point, this might result in 0.999999999 tokens
+    vi.advanceTimersByTime(334); // Just over 1 token worth
+
+    // TOKEN_EPSILON should allow this to pass
+    expect(limiter.allow('key')).toBe(true);
+  });
+
+  it('should correctly deny when clearly below threshold', () => {
+    const limiter = new RateLimiter({
+      rate: 10,
+      burst: 1,
+      interval: 1000,
+    });
+
+    // Drain the bucket
+    expect(limiter.allow('key')).toBe(true);
+    expect(limiter.allow('key')).toBe(false);
+
+    // Advance only 50ms (0.5 tokens, clearly below 1)
+    vi.advanceTimersByTime(50);
+
+    // Should still be denied (0.5 tokens is not enough)
+    expect(limiter.allow('key')).toBe(false);
+  });
+
+  it('should export TOKEN_EPSILON constant', async () => {
+    const { TOKEN_EPSILON } = await import('../src/config.js');
+
+    expect(TOKEN_EPSILON).toBe(1e-9);
+    expect(typeof TOKEN_EPSILON).toBe('number');
   });
 });
 

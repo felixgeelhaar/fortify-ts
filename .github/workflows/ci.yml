@@ -34,6 +34,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Cache Turborepo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
       - name: Lint
         if: matrix.node-version == '20'
         run: pnpm lint
@@ -45,5 +53,55 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Test
-        run: pnpm test
+      - name: Test with Coverage
+        run: pnpm test:coverage
+
+      - name: Check Coverage Thresholds
+        if: matrix.node-version == '20'
+        run: |
+          # Extract coverage percentages from coverage-summary.json
+          COVERAGE_FILE="coverage/coverage-summary.json"
+          if [ -f "$COVERAGE_FILE" ]; then
+            LINES=$(node -e "console.log(require('./$COVERAGE_FILE').total.lines.pct)")
+            STATEMENTS=$(node -e "console.log(require('./$COVERAGE_FILE').total.statements.pct)")
+            FUNCTIONS=$(node -e "console.log(require('./$COVERAGE_FILE').total.functions.pct)")
+            BRANCHES=$(node -e "console.log(require('./$COVERAGE_FILE').total.branches.pct)")
+
+            echo "Coverage Report:"
+            echo "  Lines:      $LINES%"
+            echo "  Statements: $STATEMENTS%"
+            echo "  Functions:  $FUNCTIONS%"
+            echo "  Branches:   $BRANCHES%"
+
+            # Thresholds (80% minimum)
+            THRESHOLD=80
+
+            FAILED=0
+            if (( $(echo "$LINES < $THRESHOLD" | bc -l) )); then
+              echo "❌ Lines coverage ($LINES%) is below threshold ($THRESHOLD%)"
+              FAILED=1
+            fi
+            if (( $(echo "$STATEMENTS < $THRESHOLD" | bc -l) )); then
+              echo "❌ Statements coverage ($STATEMENTS%) is below threshold ($THRESHOLD%)"
+              FAILED=1
+            fi
+            if (( $(echo "$FUNCTIONS < $THRESHOLD" | bc -l) )); then
+              echo "❌ Functions coverage ($FUNCTIONS%) is below threshold ($THRESHOLD%)"
+              FAILED=1
+            fi
+            if (( $(echo "$BRANCHES < $THRESHOLD" | bc -l) )); then
+              echo "❌ Branches coverage ($BRANCHES%) is below threshold ($THRESHOLD%)"
+              FAILED=1
+            fi
+
+            if [ $FAILED -eq 1 ]; then
+              echo ""
+              echo "Coverage thresholds not met. Please add more tests."
+              exit 1
+            else
+              echo "✅ All coverage thresholds met!"
+            fi
+          else
+            echo "Coverage summary file not found"
+            exit 1
+          fi

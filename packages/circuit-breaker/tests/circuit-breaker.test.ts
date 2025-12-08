@@ -112,7 +112,7 @@ describe('CircuitBreaker', () => {
     });
 
     it('should transition to half-open after timeout', async () => {
-      const cb = new CircuitBreaker<string>({ maxFailures: 1, timeout: 5000 });
+      const cb = new CircuitBreaker<string>({ maxFailures: 1, timeout: 5000, timeoutJitter: 0 });
 
       await expect(cb.execute(async () => {
         throw new Error('fail');
@@ -167,7 +167,7 @@ describe('CircuitBreaker', () => {
     });
 
     it('should close after success in half-open', async () => {
-      const cb = new CircuitBreaker<string>({ maxFailures: 1, timeout: 5000 });
+      const cb = new CircuitBreaker<string>({ maxFailures: 1, timeout: 5000, timeoutJitter: 0 });
 
       // Trip the circuit
       await expect(cb.execute(async () => {
@@ -189,7 +189,7 @@ describe('CircuitBreaker', () => {
     });
 
     it('should reopen after failure in half-open', async () => {
-      const cb = new CircuitBreaker<string>({ maxFailures: 1, timeout: 5000 });
+      const cb = new CircuitBreaker<string>({ maxFailures: 1, timeout: 5000, timeoutJitter: 0 });
 
       // Trip the circuit
       await expect(cb.execute(async () => {
@@ -219,6 +219,7 @@ describe('CircuitBreaker', () => {
         maxFailures: 1,
         timeout: 5000,
         halfOpenMaxRequests: 2,
+        timeoutJitter: 0,
       });
 
       // Trip the circuit
@@ -301,6 +302,7 @@ describe('CircuitBreaker', () => {
         maxFailures: 1,
         timeout: 5000,
         onStateChange,
+        timeoutJitter: 0,
       });
 
       // Trip the circuit
@@ -495,14 +497,37 @@ describe('CircuitBreaker', () => {
   });
 
   describe('non-Error throws', () => {
-    it('should rethrow non-Error values without counting as failure', async () => {
+    it('should wrap non-Error throws in Error and count as failure', async () => {
       const cb = new CircuitBreaker<string>();
 
       await expect(cb.execute(async () => {
         throw 'string error';
-      })).rejects.toBe('string error');
+      })).rejects.toThrow('string error');
 
-      expect(cb.getCounts().totalFailures).toBe(0);
+      // Non-Error throws are now wrapped and counted as failures for consistent handling
+      expect(cb.getCounts().totalFailures).toBe(1);
+      cb.destroy();
+    });
+
+    it('should wrap number throws in Error', async () => {
+      const cb = new CircuitBreaker<string>();
+
+      await expect(cb.execute(async () => {
+        throw 123;
+      })).rejects.toThrow('123');
+
+      expect(cb.getCounts().totalFailures).toBe(1);
+      cb.destroy();
+    });
+
+    it('should wrap object throws in Error with JSON', async () => {
+      const cb = new CircuitBreaker<string>();
+
+      await expect(cb.execute(async () => {
+        throw { code: 'ERR_TEST' };
+      })).rejects.toThrow('ERR_TEST');
+
+      expect(cb.getCounts().totalFailures).toBe(1);
       cb.destroy();
     });
   });

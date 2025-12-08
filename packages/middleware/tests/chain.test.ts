@@ -260,4 +260,51 @@ describe('Chain', () => {
       cb.destroy();
     });
   });
+
+  describe('length and isEmpty', () => {
+    it('should return 0 for empty chain', () => {
+      const chain = new Chain<string>();
+      expect(chain.length).toBe(0);
+    });
+
+    it('should return true for isEmpty on empty chain', () => {
+      const chain = new Chain<string>();
+      expect(chain.isEmpty()).toBe(true);
+    });
+
+    it('should return false for isEmpty after adding middleware', () => {
+      const chain = new Chain<string>().use((next) => next);
+      expect(chain.isEmpty()).toBe(false);
+    });
+
+    it('should return correct length after adding middlewares', () => {
+      const cb = new CircuitBreaker<string>();
+      const retry = new Retry<string>();
+
+      const chain = new Chain<string>()
+        .withCircuitBreaker(cb)
+        .withRetry(retry)
+        .use((next) => next);
+
+      expect(chain.length).toBe(3);
+      expect(chain.isEmpty()).toBe(false);
+
+      cb.destroy();
+    });
+
+    it('should count each pattern addition separately', () => {
+      const rl = new RateLimiter();
+      const timeout = new Timeout<string>();
+      const bh = new Bulkhead<string>();
+      const fb = new Fallback<string>({ fallback: async () => '' });
+
+      const chain = new Chain<string>()
+        .withRateLimit(rl, 'key1')
+        .withTimeout(timeout, 1000)
+        .withBulkhead(bh)
+        .withFallback(fb);
+
+      expect(chain.length).toBe(4);
+    });
+  });
 });

@@ -5,7 +5,7 @@ export default defineConfig({
   format: ['esm', 'cjs'],
   dts: true,
   clean: true,
-  target: ['es2020', 'node18'],
+  target: ['es2022', 'node20'],
   platform: 'node',
   sourcemap: true,
   external: ['prom-client'],

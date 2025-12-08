@@ -1,6 +1,30 @@
 import { type FortifyLogger, type LogContext } from './logger.js';
 
 /**
+ * Keys that should never be merged to prevent prototype pollution.
+ */
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Safely merge context objects, filtering out prototype pollution keys.
+ */
+function safeContextMerge(...contexts: (LogContext | undefined)[]): LogContext {
+  const result: LogContext = {};
+
+  for (const context of contexts) {
+    if (!context) continue;
+
+    for (const key of Object.keys(context)) {
+      if (!UNSAFE_KEYS.has(key)) {
+        result[key] = context[key];
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
  * Console logger configuration.
  */
 export interface ConsoleLoggerConfig {
@@ -48,7 +72,7 @@ export function createConsoleLogger(config: ConsoleLoggerConfig = {}): FortifyLo
     context?: LogContext
   ): string | object {
     const timestamp = timestamps ? new Date().toISOString() : undefined;
-    const mergedContext = { ...boundContext, ...context };
+    const mergedContext = safeContextMerge(boundContext, context);
 
     if (json) {
       return {
@@ -86,13 +110,12 @@ export function createConsoleLogger(config: ConsoleLoggerConfig = {}): FortifyLo
     };
     const childLogger = createConsoleLogger(childConfig);
 
-    // Merge bindings
+    // Merge bindings safely to prevent prototype pollution
     const childBoundContext = (childLogger as unknown as { boundContext: LogContext }).boundContext;
-    Object.assign(
-      childBoundContext,
-      boundContext,
-      additionalBindings
-    );
+    const mergedBindings = safeContextMerge(boundContext, additionalBindings);
+    for (const key of Object.keys(mergedBindings)) {
+      childBoundContext[key] = mergedBindings[key];
+    }
 
     return childLogger;
   }

@@ -135,7 +135,7 @@ describe('Browser Compatibility', () => {
       const cb = new CircuitBreaker<string>({ maxFailures: 2, timeout: 100 });
       const result = await cb.execute(async () => 'success');
       expect(result).toBe('success');
-      cb.destroy();
+      await cb.close();
     });
 
     it('Retry works', async () => {

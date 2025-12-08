@@ -158,7 +158,7 @@ describe('Circuit Breaker Middleware', () => {
     expect(response.status).toBe(200);
     expect(handler).toHaveBeenCalled();
 
-    cb.destroy();
+    await cb.close();
   });
 
   it('should return 503 when circuit is open', async () => {
@@ -175,7 +175,7 @@ describe('Circuit Breaker Middleware', () => {
     const response = await wrapped(createRequest());
     expect(response.status).toBe(503);
 
-    cb.destroy();
+    await cb.close();
   });
 
   it('should use custom onOpen response', async () => {
@@ -191,7 +191,7 @@ describe('Circuit Breaker Middleware', () => {
     const response = await wrapped(createRequest());
     expect(response.body).toEqual({ error: 'Custom message' });
 
-    cb.destroy();
+    await cb.close();
   });
 });
 

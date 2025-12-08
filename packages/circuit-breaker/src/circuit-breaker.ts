@@ -2,9 +2,11 @@ import {
   type Operation,
   type Pattern,
   type Resettable,
+  type Closeable,
   CircuitOpenError,
   type FortifyLogger,
   noopLogger,
+  NEVER_ABORTED_SIGNAL,
 } from '@fortify-ts/core';
 import {
   type CircuitBreakerConfig,
@@ -42,7 +44,7 @@ import { type Counts, createCounts, recordSuccess, recordFailure } from './count
  * });
  * ```
  */
-export class CircuitBreaker<T> implements Pattern<T>, Resettable {
+export class CircuitBreaker<T> implements Pattern<T>, Resettable, Closeable {
   private readonly config: CircuitBreakerConfig;
   private readonly logger: FortifyLogger;
 
@@ -105,21 +107,23 @@ export class CircuitBreaker<T> implements Pattern<T>, Resettable {
     });
 
     try {
-      const result = await operation(signal ?? new AbortController().signal);
+      const result = await operation(signal ?? NEVER_ABORTED_SIGNAL);
       this.onSuccess();
       return result;
     } catch (error) {
-      if (!(error instanceof Error)) {
-        throw error;
-      }
+      // Wrap non-Error throws to ensure consistent error handling
+      const wrappedError =
+        error instanceof Error
+          ? error
+          : new Error(typeof error === 'string' ? error : JSON.stringify(error));
 
       // Check if cancelled
       if (signal?.aborted) {
         throw signal.reason ?? new DOMException('Aborted', 'AbortError');
       }
 
-      this.onFailure(error);
-      throw error;
+      this.onFailure(wrappedError);
+      throw wrappedError;
     }
   }
 
@@ -154,7 +158,23 @@ export class CircuitBreaker<T> implements Pattern<T>, Resettable {
   }
 
   /**
+   * Close the circuit breaker and release resources.
+   * Clears the interval timer used for count clearing.
+   *
+   * @returns Promise that resolves immediately (sync cleanup)
+   */
+  close(): Promise<void> {
+    if (this.intervalId !== undefined) {
+      clearInterval(this.intervalId);
+      this.intervalId = undefined;
+    }
+    this.logger.info('Circuit breaker closed');
+    return Promise.resolve();
+  }
+
+  /**
    * Clean up resources (interval timer).
+   * @deprecated Use close() instead for consistent lifecycle API
    */
   destroy(): void {
     if (this.intervalId !== undefined) {

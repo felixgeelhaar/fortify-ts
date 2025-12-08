@@ -7,22 +7,28 @@ import { type FortifyLogger } from '@fortify-ts/core';
 export const backoffPolicySchema = z.enum(['exponential', 'linear', 'constant']);
 export type BackoffPolicy = z.infer<typeof backoffPolicySchema>;
 
+/** Maximum allowed retry attempts to prevent DoS/resource exhaustion */
+const MAX_RETRY_ATTEMPTS = 100;
+
+/** Maximum allowed delay in milliseconds (1 hour) */
+const MAX_DELAY_MS = 3_600_000;
+
 /**
  * Zod schema for Retry configuration.
  */
 export const retryConfigSchema = z.object({
-  /** Maximum number of attempts including the first (default: 3) */
-  maxAttempts: z.number().int().positive().default(3),
-  /** Initial delay before first retry in milliseconds (default: 100) */
-  initialDelay: z.number().int().positive().default(100),
-  /** Maximum delay between retries in milliseconds */
-  maxDelay: z.number().int().positive().optional(),
+  /** Maximum number of attempts including the first (default: 3, max: 100) */
+  maxAttempts: z.number().int().positive().max(MAX_RETRY_ATTEMPTS).default(3),
+  /** Initial delay before first retry in milliseconds (default: 100, max: 1 hour) */
+  initialDelay: z.number().int().positive().max(MAX_DELAY_MS).default(100),
+  /** Maximum delay between retries in milliseconds (max: 1 hour) */
+  maxDelay: z.number().int().positive().max(MAX_DELAY_MS).optional(),
   /** Backoff strategy (default: 'exponential') */
   backoffPolicy: backoffPolicySchema.default('exponential'),
-  /** Multiplier for exponential backoff (default: 2.0) */
-  multiplier: z.number().positive().default(2.0),
-  /** Add random jitter to delays (default: false) */
-  jitter: z.boolean().default(false),
+  /** Multiplier for exponential backoff (default: 2.0, max: 10) */
+  multiplier: z.number().positive().max(10).default(2.0),
+  /** Add random jitter to delays to prevent thundering herd (default: true) */
+  jitter: z.boolean().default(true),
 });
 
 /**

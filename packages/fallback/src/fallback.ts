@@ -3,6 +3,7 @@ import {
   type Pattern,
   type FortifyLogger,
   noopLogger,
+  NEVER_ABORTED_SIGNAL,
 } from '@fortify-ts/core';
 import { type FallbackConfig, validateFallbackConfig } from './config.js';
 
@@ -59,7 +60,7 @@ export class Fallback<T> implements Pattern<T> {
       throw signal.reason ?? new DOMException('Aborted', 'AbortError');
     }
 
-    const operationSignal = signal ?? new AbortController().signal;
+    const operationSignal = signal ?? NEVER_ABORTED_SIGNAL;
 
     try {
       // Execute primary operation

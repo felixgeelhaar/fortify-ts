@@ -94,6 +94,7 @@ describe('CircuitBreaker Property-Based Tests', () => {
             const cb = new CircuitBreaker<string>({
               maxFailures,
               timeout,
+              timeoutJitter: 0, // Disable jitter for deterministic tests
             });
 
             // Trip the circuit

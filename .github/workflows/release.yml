@@ -41,16 +41,54 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      - name: Create Release Pull Request
+      - name: Create Release Pull Request or Publish
         id: changesets
         uses: changesets/action@v1
         with:
           version: pnpm changeset version
+          publish: pnpm changeset publish --access public --provenance
           commit: 'chore: release packages'
           title: 'chore: release packages'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish to npm with OIDC
-        if: steps.changesets.outputs.hasChangesets == 'false'
-        run: pnpm changeset publish --access public
+      - name: Create GitHub Release
+        if: steps.changesets.outputs.published == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const publishedPackages = JSON.parse('${{ steps.changesets.outputs.publishedPackages }}');
+
+            for (const pkg of publishedPackages) {
+              const tagName = `${pkg.name}@${pkg.version}`;
+              const releaseName = `${pkg.name} v${pkg.version}`;
+
+              try {
+                await github.rest.repos.createRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  tag_name: tagName,
+                  name: releaseName,
+                  body: `## ${releaseName}\n\nSee [CHANGELOG](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/packages/${pkg.name.replace('@fortify-ts/', '')}/CHANGELOG.md) for details.`,
+                  draft: false,
+                  prerelease: pkg.version.includes('-'),
+                });
+                console.log(`Created release for ${tagName}`);
+              } catch (error) {
+                console.log(`Failed to create release for ${tagName}: ${error.message}`);
+              }
+            }
+
+      - name: Verify Published Packages
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+          echo "Verifying published packages..."
+          sleep 10  # Wait for npm registry to update
+          PACKAGES='${{ steps.changesets.outputs.publishedPackages }}'
+          echo "$PACKAGES" | jq -r '.[].name' | while read pkg; do
+            VERSION=$(echo "$PACKAGES" | jq -r --arg name "$pkg" '.[] | select(.name == $name) | .version')
+            echo "Checking $pkg@$VERSION..."
+            npm view "$pkg@$VERSION" version || echo "Warning: $pkg@$VERSION not yet available on npm"
+          done

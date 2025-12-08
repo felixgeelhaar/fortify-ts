@@ -5,9 +5,27 @@ export {
   type RateLimitConfig,
   type RateLimitConfigInput,
   type RateLimitConfigInputFull,
+  type RateLimitContext,
+  type KeyFunc,
   type StorageFailureMode,
   parseRateLimitConfig,
+  TOKEN_EPSILON,
 } from './config.js';
+export {
+  type RateLimiterMetrics,
+  type MetricsContext,
+  type StorageLatencyContext,
+  noopMetrics,
+} from './metrics.js';
+export {
+  RateLimiterError,
+  StorageUnavailableError,
+  KeyTooLongError,
+  StorageTimeoutError,
+  InvalidBucketStateError,
+  TokensExceededError,
+  HealthCheckError,
+} from './errors.js';
 
 // Re-export storage types from core for convenience
 export {

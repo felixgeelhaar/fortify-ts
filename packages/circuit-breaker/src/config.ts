@@ -3,20 +3,32 @@ import { type FortifyLogger } from '@fortify-ts/core';
 import { type Counts } from './counts.js';
 import { type State } from './state.js';
 
+/** Maximum failures to prevent unreasonable thresholds */
+const MAX_FAILURES = 10_000;
+
+/** Maximum timeout in milliseconds (1 hour) */
+const MAX_TIMEOUT_MS = 3_600_000;
+
+/** Maximum interval in milliseconds (1 day) */
+const MAX_INTERVAL_MS = 86_400_000;
+
+/** Maximum half-open requests */
+const MAX_HALF_OPEN_REQUESTS = 1000;
+
 /**
  * Zod schema for CircuitBreaker configuration.
  */
 export const circuitBreakerConfigSchema = z.object({
-  /** Maximum consecutive failures before opening (default: 5) */
-  maxFailures: z.number().int().positive().default(5),
-  /** Duration in open state before transitioning to half-open in milliseconds (default: 60000) */
-  timeout: z.number().int().positive().default(60000),
-  /** Maximum requests allowed in half-open state (default: 1) */
-  halfOpenMaxRequests: z.number().int().positive().default(1),
-  /** Period to clear counts when closed, 0 means never (default: 0) */
-  interval: z.number().int().nonnegative().default(0),
-  /** Jitter factor for timeout (0-1), adds randomness to prevent thundering herd (default: 0) */
-  timeoutJitter: z.number().min(0).max(1).default(0),
+  /** Maximum consecutive failures before opening (default: 5, max: 10000) */
+  maxFailures: z.number().int().positive().max(MAX_FAILURES).default(5),
+  /** Duration in open state before transitioning to half-open in milliseconds (default: 60000, max: 1 hour) */
+  timeout: z.number().int().positive().max(MAX_TIMEOUT_MS).default(60000),
+  /** Maximum requests allowed in half-open state (default: 1, max: 1000) */
+  halfOpenMaxRequests: z.number().int().positive().max(MAX_HALF_OPEN_REQUESTS).default(1),
+  /** Period to clear counts when closed, 0 means never (default: 0, max: 1 day) */
+  interval: z.number().int().nonnegative().max(MAX_INTERVAL_MS).default(0),
+  /** Jitter factor for timeout (0-1), adds randomness to prevent thundering herd (default: 0.1) */
+  timeoutJitter: z.number().min(0).max(1).default(0.1),
 });
 
 /**

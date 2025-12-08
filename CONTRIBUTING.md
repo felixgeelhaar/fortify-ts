@@ -43,7 +43,7 @@ Feature requests are welcome! Please provide:
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+ (check `.nvmrc` for exact version)
 - pnpm 9+
 
 ### Getting Started

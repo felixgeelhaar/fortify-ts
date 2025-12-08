@@ -1,4 +1,4 @@
-import { type Operation, type Pattern } from '@fortify-ts/core';
+import { type Operation, type Pattern, NEVER_ABORTED_SIGNAL } from '@fortify-ts/core';
 import { type Timeout } from '@fortify-ts/timeout';
 import { type Retry } from '@fortify-ts/retry';
 import { type CircuitBreaker } from '@fortify-ts/circuit-breaker';
@@ -139,9 +139,24 @@ export class Chain<T> implements Pattern<T> {
   }
 
   /**
+   * Get the number of middlewares in the chain.
+   */
+  get length(): number {
+    return this.middlewares.length;
+  }
+
+  /**
+   * Check if the chain has any middlewares.
+   */
+  isEmpty(): boolean {
+    return this.middlewares.length === 0;
+  }
+
+  /**
    * Execute an operation through all middlewares in the chain.
    *
    * Middlewares are applied in the order they were added to the chain.
+   * If no middlewares are configured, the operation is executed directly.
    *
    * @param operation - The async operation to execute
    * @param signal - Optional AbortSignal for cancellation
@@ -149,13 +164,13 @@ export class Chain<T> implements Pattern<T> {
    */
   execute(operation: Operation<T>, signal?: AbortSignal): Promise<T> {
     // Build the chain from right to left (last added = innermost)
+    // Note: middlewares array is private and never contains null values,
+    // so no null check is needed in this hot path
     let next = operation;
     for (let i = this.middlewares.length - 1; i >= 0; i--) {
-      const middleware = this.middlewares[i];
-      if (middleware) {
-        next = middleware(next);
-      }
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      next = this.middlewares[i]!(next);
     }
-    return next(signal ?? new AbortController().signal);
+    return next(signal ?? NEVER_ABORTED_SIGNAL);
   }
 }

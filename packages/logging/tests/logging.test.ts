@@ -53,6 +53,89 @@ describe('createConsoleLogger', () => {
     vi.restoreAllMocks();
   });
 
+  describe('prototype pollution prevention', () => {
+    it('should filter __proto__ from context', () => {
+      const logger = createConsoleLogger({ timestamps: false });
+      const maliciousContext = JSON.parse('{"__proto__": {"polluted": true}, "safe": "value"}');
+
+      logger.info('test message', maliciousContext);
+
+      // Verify Object prototype was not polluted
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+
+      // Verify safe properties are still included
+      const output = consoleSpy.info.mock.calls[0]?.[0] as string;
+      expect(output).toContain('"safe":"value"');
+      expect(output).not.toContain('__proto__');
+    });
+
+    it('should filter constructor from context', () => {
+      const logger = createConsoleLogger({ timestamps: false });
+      const maliciousContext = { constructor: { polluted: true }, safe: 'value' };
+
+      logger.info('test message', maliciousContext);
+
+      const output = consoleSpy.info.mock.calls[0]?.[0] as string;
+      expect(output).toContain('"safe":"value"');
+      expect(output).not.toContain('constructor');
+    });
+
+    it('should filter prototype from context', () => {
+      const logger = createConsoleLogger({ timestamps: false });
+      const maliciousContext = { prototype: { polluted: true }, safe: 'value' };
+
+      logger.info('test message', maliciousContext);
+
+      const output = consoleSpy.info.mock.calls[0]?.[0] as string;
+      expect(output).toContain('"safe":"value"');
+      expect(output).not.toContain('"prototype"');
+    });
+
+    it('should prevent prototype pollution via child logger', () => {
+      const logger = createConsoleLogger({ timestamps: false });
+      const maliciousBindings = JSON.parse('{"__proto__": {"childPolluted": true}}');
+
+      const child = logger.child(maliciousBindings);
+      child.info('test message');
+
+      // Verify Object prototype was not polluted
+      expect(({} as Record<string, unknown>).childPolluted).toBeUndefined();
+    });
+
+    it('should handle multiple unsafe keys in same context', () => {
+      const logger = createConsoleLogger({ timestamps: false });
+      const maliciousContext = JSON.parse(
+        '{"__proto__": {"a": 1}, "constructor": {"b": 2}, "prototype": {"c": 3}, "safe": "value"}'
+      );
+
+      logger.info('test message', maliciousContext);
+
+      // Verify no pollution
+      expect(({} as Record<string, unknown>).a).toBeUndefined();
+
+      // Verify safe properties work
+      const output = consoleSpy.info.mock.calls[0]?.[0] as string;
+      expect(output).toContain('"safe":"value"');
+    });
+
+    it('should work correctly in JSON mode', () => {
+      const logger = createConsoleLogger({ json: true });
+      const maliciousContext = JSON.parse('{"__proto__": {"polluted": true}, "safe": "value"}');
+
+      logger.info('test message', maliciousContext);
+
+      // Verify Object prototype was not polluted
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+
+      // Verify JSON output contains safe properties
+      const output = consoleSpy.info.mock.calls[0]?.[0] as string;
+      const parsed = JSON.parse(output);
+      expect(parsed.safe).toBe('value');
+      // Check that __proto__ key is not present in output (using hasOwnProperty)
+      expect(Object.prototype.hasOwnProperty.call(parsed, '__proto__')).toBe(false);
+    });
+  });
+
   it('should log at all levels', () => {
     const logger = createConsoleLogger({ level: 'debug' });
 

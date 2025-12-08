@@ -1,6 +1,15 @@
 import { TimeoutError } from './errors.js';
 
 /**
+ * A static never-aborted AbortSignal for use when no signal is provided.
+ * Avoids allocating a new AbortController on every operation call.
+ *
+ * This is a performance optimization for hot paths where signal is optional
+ * but the operation signature requires AbortSignal.
+ */
+export const NEVER_ABORTED_SIGNAL: AbortSignal = new AbortController().signal;
+
+/**
  * Sleep for a specified duration with optional cancellation support.
  *
  * @param ms - Duration in milliseconds
@@ -145,7 +154,7 @@ export function combineSignals(...signals: (AbortSignal | undefined)[]): AbortSi
   const validSignals = signals.filter((s): s is AbortSignal => s !== undefined);
 
   if (validSignals.length === 0) {
-    return new AbortController().signal;
+    return NEVER_ABORTED_SIGNAL;
   }
 
   const firstSignal = validSignals[0];
@@ -241,15 +250,66 @@ export function safeCallback<T extends (...args: unknown[]) => unknown>(
 }
 
 /**
- * Calculate jittered delay.
- * Adds 0-10% random variance to prevent thundering herd.
+ * Jitter mode for delay randomization.
+ *
+ * - `full`: Random delay from 0 to base delay (aggressive, best for thundering herd)
+ * - `equal`: Random delay from 50% to 100% of base delay (balanced)
+ * - `decorrelated`: Each sleep is random between base and previous sleep * 3 (AWS-style)
+ */
+export type JitterMode = 'full' | 'equal' | 'decorrelated';
+
+/**
+ * Calculate jittered delay to prevent thundering herd.
+ *
+ * Uses "equal jitter" by default: random value between 50-100% of the delay.
+ * This provides good dispersion while maintaining reasonable minimum delays.
+ *
+ * For more aggressive jitter, use mode='full' (0-100% of delay).
+ * For AWS-style decorrelated jitter, use mode='decorrelated' with previousDelay.
  *
  * @param delay - Base delay in milliseconds
+ * @param mode - Jitter mode: 'full', 'equal', or 'decorrelated' (default: 'equal')
+ * @param previousDelay - Previous delay for decorrelated mode (default: delay)
  * @returns Jittered delay
+ *
+ * @example
+ * ```typescript
+ * // Equal jitter (default): 50-100% of delay
+ * addJitter(1000); // Returns 500-1000ms
+ *
+ * // Full jitter: 0-100% of delay
+ * addJitter(1000, 'full'); // Returns 0-1000ms
+ *
+ * // Decorrelated jitter (AWS-style)
+ * let sleep = initialDelay;
+ * sleep = addJitter(baseDelay, 'decorrelated', sleep);
+ * ```
  */
-export function addJitter(delay: number): number {
-  const jitterFactor = 1 + Math.random() * 0.1; // 0-10% jitter
-  return Math.floor(delay * jitterFactor);
+export function addJitter(
+  delay: number,
+  mode: JitterMode = 'equal',
+  previousDelay?: number
+): number {
+  switch (mode) {
+    case 'full':
+      // Full jitter: random(0, delay)
+      return Math.floor(Math.random() * delay);
+
+    case 'decorrelated': {
+      // Decorrelated jitter: random(base, previous * 3)
+      // Capped at delay to prevent unbounded growth
+      const prev = previousDelay ?? delay;
+      const min = delay;
+      const max = Math.min(prev * 3, delay * 10); // Cap at 10x base
+      return Math.floor(min + Math.random() * (max - min));
+    }
+
+    case 'equal':
+    default:
+      // Equal jitter: delay/2 + random(0, delay/2)
+      // Results in 50-100% of original delay
+      return Math.floor(delay * 0.5 + Math.random() * delay * 0.5);
+  }
 }
 
 /**

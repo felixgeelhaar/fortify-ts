@@ -11,6 +11,17 @@ export class FortifyError extends Error {
       Error.captureStackTrace(this, this.constructor);
     }
   }
+
+  /**
+   * Serialize to JSON for structured logging.
+   * @returns JSON-safe representation of the error
+   */
+  toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+    };
+  }
 }
 
 /**
@@ -25,6 +36,15 @@ export class CircuitOpenError extends FortifyError {
 
 /**
  * Error thrown when rate limit is exceeded.
+ *
+ * **Security Note:** The `key` property contains the rate limiting key
+ * (e.g., user ID, IP address). When logging or exposing errors to users,
+ * consider whether exposing this value is appropriate for your use case.
+ * For sensitive keys, you may want to redact or omit this property when
+ * serializing errors for external consumption.
+ *
+ * The `toJSON()` method excludes the key by default for security.
+ * Use `toJSON(true)` to include the key when needed.
  */
 export class RateLimitExceededError extends FortifyError {
   public readonly key: string | undefined;
@@ -33,6 +53,23 @@ export class RateLimitExceededError extends FortifyError {
     super(message);
     this.name = 'RateLimitExceededError';
     this.key = key;
+  }
+
+  /**
+   * Serialize to JSON, optionally including the key.
+   *
+   * @param includeKey - Whether to include the rate limit key (default: false for security)
+   * @returns JSON-safe representation of the error
+   */
+  override toJSON(includeKey = false): Record<string, unknown> {
+    const result: Record<string, unknown> = {
+      name: this.name,
+      message: this.message,
+    };
+    if (includeKey && this.key !== undefined) {
+      result.key = this.key;
+    }
+    return result;
   }
 }
 
@@ -53,6 +90,14 @@ export class BulkheadFullError extends FortifyError {
     this.activeCount = activeCount;
     this.queuedCount = queuedCount;
   }
+
+  override toJSON(): Record<string, unknown> {
+    return {
+      ...super.toJSON(),
+      activeCount: this.activeCount,
+      queuedCount: this.queuedCount,
+    };
+  }
 }
 
 /**
@@ -65,6 +110,20 @@ export class TimeoutError extends FortifyError {
     super(message);
     this.name = 'TimeoutError';
     this.timeoutMs = timeoutMs;
+  }
+
+  /**
+   * Alias for timeoutMs for convenience.
+   */
+  get duration(): number {
+    return this.timeoutMs;
+  }
+
+  override toJSON(): Record<string, unknown> {
+    return {
+      ...super.toJSON(),
+      timeoutMs: this.timeoutMs,
+    };
   }
 }
 
@@ -84,6 +143,16 @@ export class MaxAttemptsReachedError extends FortifyError {
     this.name = 'MaxAttemptsReachedError';
     this.attempts = attempts;
     this.lastError = lastError;
+  }
+
+  override toJSON(): Record<string, unknown> {
+    return {
+      ...super.toJSON(),
+      attempts: this.attempts,
+      lastError: this.lastError
+        ? { name: this.lastError.name, message: this.lastError.message }
+        : undefined,
+    };
   }
 }
 

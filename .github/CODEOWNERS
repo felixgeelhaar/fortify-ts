@@ -1,0 +1,37 @@
+# CODEOWNERS - Defines code ownership for pull request reviews
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repository
+* @felixgeelhaar
+
+# Core package - foundational types, errors, and utilities
+/packages/core/ @felixgeelhaar
+
+# Resilience patterns
+/packages/circuit-breaker/ @felixgeelhaar
+/packages/retry/ @felixgeelhaar
+/packages/timeout/ @felixgeelhaar
+/packages/rate-limit/ @felixgeelhaar
+/packages/bulkhead/ @felixgeelhaar
+/packages/fallback/ @felixgeelhaar
+
+# Composition and middleware
+/packages/middleware/ @felixgeelhaar
+
+# Integration packages
+/packages/http/ @felixgeelhaar
+/packages/testing/ @felixgeelhaar
+
+# Observability packages
+/packages/logging/ @felixgeelhaar
+/packages/metrics/ @felixgeelhaar
+/packages/tracing/ @felixgeelhaar
+
+# CI/CD and infrastructure
+/.github/ @felixgeelhaar
+
+# Build configuration
+/turbo.json @felixgeelhaar
+/tsconfig.base.json @felixgeelhaar
+/eslint.config.js @felixgeelhaar
+/vitest.config.ts @felixgeelhaar

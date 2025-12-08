@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Bulkhead } from '../src/bulkhead.js';
 import { Semaphore } from '../src/semaphore.js';
-import { BulkheadFullError } from '@fortify-ts/core';
+import { BulkheadFullError, BulkheadClosedError } from '@fortify-ts/core';
 
 describe('Semaphore', () => {
   describe('tryAcquire', () => {
@@ -111,6 +111,71 @@ describe('Semaphore', () => {
       await expect(p1).rejects.toThrow('test error');
       await expect(p2).rejects.toThrow('test error');
       expect(sem.queueLength()).toBe(0);
+    });
+
+    it('should reject waiters with abort signals and clean up listeners', async () => {
+      const sem = new Semaphore(0);
+      const controller = new AbortController();
+      const error = new Error('closed');
+
+      // Acquire with a signal - tests the abort listener cleanup path in rejectAll
+      const p1 = sem.acquire(controller.signal);
+
+      sem.rejectAll(error);
+
+      await expect(p1).rejects.toThrow('closed');
+      expect(sem.queueLength()).toBe(0);
+    });
+  });
+
+  describe('release with signal cleanup', () => {
+    it('should clean up abort listener when releasing to waiter with signal', async () => {
+      const sem = new Semaphore(1);
+      const controller = new AbortController();
+
+      // Acquire first permit
+      await sem.acquire();
+      expect(sem.availablePermits()).toBe(0);
+
+      // Queue a second acquire with a signal
+      const acquirePromise = sem.acquire(controller.signal);
+
+      // Release should give permit to queued waiter and clean up its abort listener
+      sem.release();
+      await acquirePromise;
+
+      // The waiter got the permit, abort listener should be cleaned up
+      // Aborting now should have no effect (listener was removed)
+      controller.abort();
+      expect(sem.availablePermits()).toBe(0);
+    });
+
+    it('should handle release when queue is empty and permits at max', () => {
+      const sem = new Semaphore(2);
+      // Already at max permits, release should be no-op
+      sem.release();
+      sem.release();
+      expect(sem.availablePermits()).toBe(2);
+    });
+  });
+
+  describe('acquire with non-Error abort reason', () => {
+    it('should handle string abort reason in already-aborted signal', async () => {
+      const sem = new Semaphore(0);
+      const controller = new AbortController();
+      controller.abort('string reason');
+
+      await expect(sem.acquire(controller.signal)).rejects.toThrow();
+    });
+
+    it('should handle string abort reason while waiting', async () => {
+      const sem = new Semaphore(0);
+      const controller = new AbortController();
+
+      const acquirePromise = sem.acquire(controller.signal);
+      controller.abort('string reason');
+
+      await expect(acquirePromise).rejects.toThrow();
     });
   });
 });
@@ -260,7 +325,7 @@ describe('Bulkhead', () => {
       const bh = new Bulkhead<string>();
       bh.close();
 
-      await expect(bh.execute(async () => 'result')).rejects.toThrow(BulkheadFullError);
+      await expect(bh.execute(async () => 'result')).rejects.toThrow(BulkheadClosedError);
     });
 
     it('should reject pending queue requests on close', async () => {
@@ -298,7 +363,7 @@ describe('Bulkhead', () => {
       const bh = new Bulkhead<string>();
       bh.close();
 
-      await expect(bh.execute(async () => 'result')).rejects.toThrow(BulkheadFullError);
+      await expect(bh.execute(async () => 'result')).rejects.toThrow(BulkheadClosedError);
 
       bh.reset();
 

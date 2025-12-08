@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { type FortifyLogger, type RateLimitStorage } from '@fortify-ts/core';
+import { type RateLimiterMetrics } from './metrics.js';
 
 /**
  * Behavior when external storage operations fail.
@@ -9,6 +10,22 @@ import { type FortifyLogger, type RateLimitStorage } from '@fortify-ts/core';
  * - `throw`: Throw the storage error (explicit handling required)
  */
 export type StorageFailureMode = 'fail-open' | 'fail-closed' | 'throw';
+
+/**
+ * Context object passed to KeyFunc and onLimit callbacks.
+ */
+export interface RateLimitContext {
+  /** Request identifier (e.g., request ID, trace ID) */
+  readonly requestId?: string;
+  /** Additional metadata for the request */
+  readonly [key: string]: unknown;
+}
+
+/**
+ * Function to extract a rate limiting key from context.
+ * Returns the key to use for rate limiting, or undefined to skip rate limiting.
+ */
+export type KeyFunc = (context: RateLimitContext) => string | undefined;
 
 /** Maximum reasonable rate limit (1 billion tokens) */
 const MAX_TOKENS = 1_000_000_000;
@@ -30,6 +47,30 @@ const MAX_STORAGE_TIMEOUT_MS = 300_000;
 
 /** Maximum storage TTL (1 week) */
 const MAX_STORAGE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Default max key length */
+const DEFAULT_MAX_KEY_LENGTH = 256;
+
+/** Maximum max key length */
+const MAX_KEY_LENGTH_LIMIT = 4096;
+
+/** Default cleanup interval (60 seconds) */
+const DEFAULT_CLEANUP_INTERVAL_MS = 60_000;
+
+/** Minimum cleanup interval (1 second) */
+const MIN_CLEANUP_INTERVAL_MS = 1000;
+
+/** Maximum cleanup interval (1 hour) */
+const MAX_CLEANUP_INTERVAL_MS = 3_600_000;
+
+/** Default sanitization cache size */
+const DEFAULT_SANITIZATION_CACHE_SIZE = 1000;
+
+/** Maximum sanitization cache size */
+const MAX_SANITIZATION_CACHE_SIZE = 100_000;
+
+/** Float epsilon for token calculations (handles floating point precision) */
+export const TOKEN_EPSILON = 1e-9;
 
 /**
  * Zod schema for RateLimiter configuration.
@@ -64,7 +105,7 @@ export interface RateLimitConfig extends Omit<RateLimitConfigParsed, 'burst'> {
   /** Maximum number of buckets to keep in memory (0 = unlimited) */
   readonly maxBuckets: number;
   /** Callback when rate limit is exceeded */
-  readonly onLimit: ((key: string) => void) | undefined;
+  readonly onLimit: ((key: string, context?: RateLimitContext) => void) | undefined;
   /** Logger instance for structured logging */
   readonly logger: FortifyLogger | undefined;
   /**
@@ -99,6 +140,39 @@ export interface RateLimitConfig extends Omit<RateLimitConfigParsed, 'burst'> {
    * Default: 5000ms (5 seconds)
    */
   readonly storageTimeoutMs: number;
+  /**
+   * Metrics interface for observing rate limiter behavior.
+   * Provides callbacks for allowed/denied requests and storage latency.
+   */
+  readonly metrics: RateLimiterMetrics | undefined;
+  /**
+   * Maximum tokens that can be requested in a single operation (DoS protection).
+   * Default: burst * 10
+   */
+  readonly maxTokensPerRequest: number;
+  /**
+   * Function to extract rate limiting key from context.
+   * If provided, allows dynamic key extraction from request context.
+   */
+  readonly keyFunc: KeyFunc | undefined;
+  /**
+   * Maximum allowed key length.
+   * Keys exceeding this length will throw KeyTooLongError.
+   * Default: 256
+   */
+  readonly maxKeyLength: number;
+  /**
+   * Interval in milliseconds for automatic cleanup of expired buckets.
+   * Set to 0 to disable automatic cleanup.
+   * Default: 60000 (60 seconds)
+   */
+  readonly cleanupIntervalMs: number;
+  /**
+   * Maximum size of the key sanitization LRU cache.
+   * Higher values improve performance for repeated keys but use more memory.
+   * Default: 1000
+   */
+  readonly sanitizationCacheSize: number;
 }
 
 /**
@@ -107,7 +181,8 @@ export interface RateLimitConfig extends Omit<RateLimitConfigParsed, 'burst'> {
 export interface RateLimitConfigInputFull extends RateLimitConfigInput {
   /** Maximum number of buckets to keep in memory (default: 10000, 0 = unlimited) */
   maxBuckets?: number;
-  onLimit?: (key: string) => void;
+  /** Callback when rate limit is exceeded (receives key and optional context) */
+  onLimit?: (key: string, context?: RateLimitContext) => void;
   logger?: FortifyLogger;
   /**
    * External storage adapter for distributed/serverless environments.
@@ -162,6 +237,52 @@ export interface RateLimitConfigInputFull extends RateLimitConfigInput {
    * Default: 5000ms (5 seconds)
    */
   storageTimeoutMs?: number;
+  /**
+   * Metrics interface for observing rate limiter behavior.
+   * Provides callbacks for allowed/denied requests and storage latency.
+   */
+  metrics?: RateLimiterMetrics;
+  /**
+   * Maximum tokens that can be requested in a single operation (DoS protection).
+   * Default: burst * 10
+   */
+  maxTokensPerRequest?: number;
+  /**
+   * Function to extract rate limiting key from context.
+   * If provided, allows dynamic key extraction from request context.
+   *
+   * @example
+   * ```typescript
+   * const limiter = new RateLimiter({
+   *   rate: 100,
+   *   keyFunc: (ctx) => ctx.userId as string | undefined
+   * });
+   *
+   * // Use with context
+   * if (limiter.allowWithContext({ userId: 'user-123' })) {
+   *   // Process request
+   * }
+   * ```
+   */
+  keyFunc?: KeyFunc;
+  /**
+   * Maximum allowed key length.
+   * Keys exceeding this length will throw KeyTooLongError.
+   * Default: 256
+   */
+  maxKeyLength?: number;
+  /**
+   * Interval in milliseconds for automatic cleanup of expired buckets.
+   * Set to 0 to disable automatic cleanup.
+   * Default: 60000 (60 seconds)
+   */
+  cleanupIntervalMs?: number;
+  /**
+   * Maximum size of the key sanitization LRU cache.
+   * Higher values improve performance for repeated keys but use more memory.
+   * Default: 1000, Max: 100000
+   */
+  sanitizationCacheSize?: number;
 }
 
 /**
@@ -212,6 +333,53 @@ export function parseRateLimitConfig(config?: RateLimitConfigInputFull): RateLim
     );
   }
 
+  // Validate maxKeyLength if provided
+  const maxKeyLength = config?.maxKeyLength ?? DEFAULT_MAX_KEY_LENGTH;
+  if (
+    !Number.isFinite(maxKeyLength) ||
+    maxKeyLength < 1 ||
+    maxKeyLength > MAX_KEY_LENGTH_LIMIT
+  ) {
+    throw new Error(
+      `maxKeyLength must be between 1 and ${String(MAX_KEY_LENGTH_LIMIT)}, got ${String(config?.maxKeyLength)}`
+    );
+  }
+
+  // Validate cleanupIntervalMs if provided
+  const cleanupIntervalMs = config?.cleanupIntervalMs ?? DEFAULT_CLEANUP_INTERVAL_MS;
+  if (cleanupIntervalMs !== 0) {
+    if (
+      !Number.isFinite(cleanupIntervalMs) ||
+      cleanupIntervalMs < MIN_CLEANUP_INTERVAL_MS ||
+      cleanupIntervalMs > MAX_CLEANUP_INTERVAL_MS
+    ) {
+      throw new Error(
+        `cleanupIntervalMs must be 0 (disabled) or between ${String(MIN_CLEANUP_INTERVAL_MS)}ms and ${String(MAX_CLEANUP_INTERVAL_MS)}ms, got ${String(config?.cleanupIntervalMs)}`
+      );
+    }
+  }
+
+  // Calculate default maxTokensPerRequest (DoS protection): burst * 10
+  const maxTokensPerRequest = config?.maxTokensPerRequest ?? burst * 10;
+  if (!Number.isFinite(maxTokensPerRequest) || maxTokensPerRequest < 1) {
+    throw new Error(
+      `maxTokensPerRequest must be a positive number, got ${String(config?.maxTokensPerRequest)}`
+    );
+  }
+
+  // Validate sanitizationCacheSize if provided
+  const sanitizationCacheSize =
+    config?.sanitizationCacheSize ?? DEFAULT_SANITIZATION_CACHE_SIZE;
+  if (
+    !Number.isFinite(sanitizationCacheSize) ||
+    sanitizationCacheSize < 0 ||
+    sanitizationCacheSize > MAX_SANITIZATION_CACHE_SIZE
+  ) {
+    throw new Error(
+      `sanitizationCacheSize must be between 0 and ${String(MAX_SANITIZATION_CACHE_SIZE)}, got ${String(config?.sanitizationCacheSize)}`
+    );
+  }
+
   return {
     ...parsed,
     burst,
@@ -222,5 +390,11 @@ export function parseRateLimitConfig(config?: RateLimitConfigInputFull): RateLim
     storageFailureMode: config?.storageFailureMode ?? 'fail-open',
     sanitizeKeys: config?.sanitizeKeys ?? true,
     storageTimeoutMs,
+    metrics: config?.metrics,
+    maxTokensPerRequest,
+    keyFunc: config?.keyFunc,
+    maxKeyLength,
+    cleanupIntervalMs,
+    sanitizationCacheSize,
   };
 }

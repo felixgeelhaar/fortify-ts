@@ -41,6 +41,37 @@ When reporting a vulnerability, please include:
 - **Status Update**: Within 7 days
 - **Resolution Target**: Within 30 days (depending on complexity)
 
+## Security Measures in This Library
+
+Fortify-TS implements several security measures:
+
+### 1. Prototype Pollution Prevention
+
+Context objects are filtered for dangerous keys (`__proto__`, `constructor`, `prototype`) in the logging package to prevent prototype pollution attacks.
+
+### 2. Input Validation
+
+All configuration uses Zod schemas with strict validation and bounds checking:
+- Maximum token limits to prevent integer overflow
+- Timestamp validation with reasonable bounds
+- Type-safe parsing that rejects invalid data
+
+### 3. Storage Key Sanitization
+
+Rate limiter keys are sanitized to prevent injection attacks:
+- Path traversal prevention (`../` sequences)
+- Null byte removal
+- Control character filtering
+- Key length limiting (256 chars max)
+
+### 4. Secure Error Handling
+
+Sensitive data (like rate limit keys) is excluded from error serialization by default via `toJSON()` methods.
+
+### 5. No Dynamic Code Execution
+
+No use of `eval()`, `Function()`, or other dynamic code execution patterns.
+
 ## Security Best Practices
 
 When using Fortify TS in your applications:
@@ -50,6 +81,7 @@ When using Fortify TS in your applications:
 - Always use rate limiting on public-facing APIs
 - Configure appropriate limits based on your use case
 - Consider per-user and per-IP rate limits
+- Be mindful of what data you use as rate limit keys (avoid raw PII)
 
 ### Circuit Breaker
 
@@ -62,6 +94,18 @@ When using Fortify TS in your applications:
 - Always set timeouts on external calls
 - Use appropriate timeout values for your SLAs
 - Handle timeout errors gracefully
+
+### External Storage
+
+- When using external storage adapters (Redis, etc.), ensure connections are properly secured
+- Use TLS for storage connections in production
+- Validate data retrieved from external storage
+
+### Logging
+
+- Be mindful of what data you log
+- The library's `toJSON()` methods exclude sensitive data by default
+- Don't expose internal error details to end users
 
 ### Input Validation
 
