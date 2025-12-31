@@ -44,7 +44,7 @@
     "@opentelemetry/sdk-trace-base": "^2.2.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.15"
+    "vitest": "^4.0.16"
   },
   "repository": {
     "type": "git",
