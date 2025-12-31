@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@fortify-ts/core": "workspace:*",
-    "zod": "^4.1.13"
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "fast-check": "^4.4.0",
