@@ -48,8 +48,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: ^4.2.1
-        version: 4.2.1
+        specifier: ^4.3.5
+        version: 4.3.5
     devDependencies:
       tsup:
         specifier: ^8.5.1
@@ -67,8 +67,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: ^4.2.1
-        version: 4.2.1
+        specifier: ^4.3.5
+        version: 4.3.5
     devDependencies:
       tsup:
         specifier: ^8.5.1
@@ -83,8 +83,8 @@ importers:
   packages/core:
     dependencies:
       zod:
-        specifier: ^4.2.1
-        version: 4.2.1
+        specifier: ^4.3.5
+        version: 4.3.5
     devDependencies:
       tsup:
         specifier: ^8.5.1
@@ -236,8 +236,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: ^4.2.1
-        version: 4.2.1
+        specifier: ^4.3.5
+        version: 4.3.5
     devDependencies:
       tsup:
         specifier: ^8.5.1
@@ -255,8 +255,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: ^4.2.1
-        version: 4.2.1
+        specifier: ^4.3.5
+        version: 4.3.5
     devDependencies:
       fast-check:
         specifier: ^4.5.2
@@ -314,8 +314,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: ^4.2.1
-        version: 4.2.1
+        specifier: ^4.3.5
+        version: 4.3.5
     devDependencies:
       fast-check:
         specifier: ^4.5.2
@@ -2198,8 +2198,8 @@ packages:
   zod@4.1.13:
     resolution: {integrity: sha512-AvvthqfqrAhNH9dnfmrfKzX5upOdjUVJYFqNSlkmGf64gRaTzlPwz99IHYnVs28qYAybvAlBV+H7pn0saFY4Ig==}
 
-  zod@4.2.1:
-    resolution: {integrity: sha512-0wZ1IRqGGhMP76gLqz8EyfBXKk0J2qo2+H3fi4mcUP/KtTocoX08nmIAHl1Z2kJIZbZee8KOpBCSNPRgauucjw==}
+  zod@4.3.5:
+    resolution: {integrity: sha512-k7Nwx6vuWx1IJ9Bjuf4Zt1PEllcwe7cls3VNzm4CQ1/hgtFUK2bRNG3rvnpPUhFjmqJKAKtjV576KnUkHocg/g==}
 
 snapshots:
 
@@ -3916,4 +3916,4 @@ snapshots:
 
   zod@4.1.13: {}
 
-  zod@4.2.1: {}
+  zod@4.3.5: {}
