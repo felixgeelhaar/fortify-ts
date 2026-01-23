@@ -1,5 +1,18 @@
 # @fortify-ts/middleware
 
+## 2.0.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @fortify-ts/rate-limit@0.3.1
+  - @fortify-ts/core@0.3.1
+  - @fortify-ts/bulkhead@0.2.1
+  - @fortify-ts/circuit-breaker@0.2.1
+  - @fortify-ts/fallback@0.2.1
+  - @fortify-ts/retry@0.2.1
+  - @fortify-ts/timeout@0.2.1
+
 ## 2.0.0
 
 ### Minor Changes

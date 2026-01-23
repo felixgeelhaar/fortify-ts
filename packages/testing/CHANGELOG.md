@@ -1,5 +1,12 @@
 # @fortify-ts/testing
 
+## 0.1.7
+
+### Patch Changes
+
+- Updated dependencies
+  - @fortify-ts/core@0.3.1
+
 ## 0.1.6
 
 ### Patch Changes

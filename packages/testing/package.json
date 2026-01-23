@@ -1,6 +1,6 @@
 {
   "name": "@fortify-ts/testing",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Chaos engineering testing utilities for fortify-ts resilience patterns",
   "type": "module",
   "main": "./dist/index.cjs",

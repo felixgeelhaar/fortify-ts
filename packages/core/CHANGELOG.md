@@ -1,5 +1,14 @@
 # @fortify-ts/core
 
+## 0.3.1
+
+### Patch Changes
+
+- Dependency updates and code quality improvements:
+  - Updated zod from 4.2.1 to 4.3.5
+  - Fixed CodeQL alerts in test files
+  - Updated dev dependencies (vitest, typescript-eslint, prettier, turbo)
+
 ## 0.3.0
 
 ### Minor Changes
