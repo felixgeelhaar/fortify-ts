@@ -731,7 +731,7 @@ export class RateLimiter implements Resettable, Closeable {
       const latencyMs = Date.now() - startTime;
 
       // Verify we can read back what we wrote
-      if (!retrieved || retrieved.lastRefill !== testState.lastRefill) {
+      if (retrieved?.lastRefill !== testState.lastRefill) {
         throw new HealthCheckError(
           'Health check failed: storage read/write mismatch'
         );
