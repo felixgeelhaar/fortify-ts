@@ -35,10 +35,10 @@
     "@fortify-ts/core": "workspace:*"
   },
   "devDependencies": {
-    "fast-check": "^4.5.2",
+    "fast-check": "^4.5.3",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.16"
+    "vitest": "^4.0.18"
   },
   "repository": {
     "type": "git",
