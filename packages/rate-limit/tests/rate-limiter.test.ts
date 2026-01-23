@@ -2671,14 +2671,9 @@ describe('waitAsync exponential backoff in fail-closed mode', () => {
 
   it('should reset backoff after successful storage operation', async () => {
     let callCount = 0;
-    let failNextGet = false;
     const storage: RateLimitStorage = {
       async get(): Promise<BucketState | null> {
         callCount++;
-        if (failNextGet) {
-          failNextGet = false;
-          throw new Error('Storage temporarily unavailable');
-        }
         // Return 0 tokens to force wait loop to continue
         return callCount < 3 ? { tokens: 0, lastRefill: Date.now() } : { tokens: 5, lastRefill: Date.now() };
       },

@@ -234,7 +234,7 @@ describe('Bulkhead', () => {
       };
 
       // Start 5 operations
-      const results = await Promise.all([
+      await Promise.all([
         bh.execute(operation),
         bh.execute(operation),
         bh.execute(operation),

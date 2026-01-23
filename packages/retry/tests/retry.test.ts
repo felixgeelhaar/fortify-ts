@@ -192,7 +192,6 @@ describe('Retry', () => {
         .mockRejectedValueOnce(new Error('3'))
         .mockResolvedValue('success');
 
-      const start = Date.now();
       await retry.execute(operation);
 
       // Check that delays are approximately exponential: 50, 100, 200

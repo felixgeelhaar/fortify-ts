@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Timeout } from '../src/timeout.js';
 import { TimeoutError, type Pattern } from '@fortify-ts/core';
 
