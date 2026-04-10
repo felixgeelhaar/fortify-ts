@@ -35,23 +35,23 @@
     "@fortify-ts/core": "workspace:*"
   },
   "devDependencies": {
-    "@fortify-ts/timeout": "workspace:*",
-    "@fortify-ts/retry": "workspace:*",
-    "@fortify-ts/circuit-breaker": "workspace:*",
-    "@fortify-ts/rate-limit": "workspace:*",
     "@fortify-ts/bulkhead": "workspace:*",
+    "@fortify-ts/circuit-breaker": "workspace:*",
     "@fortify-ts/fallback": "workspace:*",
+    "@fortify-ts/rate-limit": "workspace:*",
+    "@fortify-ts/retry": "workspace:*",
+    "@fortify-ts/timeout": "workspace:*",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.4"
   },
   "peerDependencies": {
-    "@fortify-ts/timeout": "^0.2.1",
-    "@fortify-ts/retry": "^0.2.1",
-    "@fortify-ts/circuit-breaker": "^0.2.1",
-    "@fortify-ts/rate-limit": "^0.3.1",
     "@fortify-ts/bulkhead": "^0.2.1",
-    "@fortify-ts/fallback": "^0.2.1"
+    "@fortify-ts/circuit-breaker": "^0.2.1",
+    "@fortify-ts/fallback": "^0.2.1",
+    "@fortify-ts/rate-limit": "^0.3.1",
+    "@fortify-ts/retry": "^0.2.1",
+    "@fortify-ts/timeout": "^0.2.1"
   },
   "peerDependenciesMeta": {
     "@fortify-ts/timeout": {
