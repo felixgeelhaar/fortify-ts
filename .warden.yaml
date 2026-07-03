@@ -1,0 +1,10 @@
+# warden gate — https://github.com/klarlabs-studio/warden (language-agnostic)
+hooks: { pre_commit: true, pre_push: true }
+commands:
+  lint: "npm run lint"
+  test: "npm test"
+  typecheck: "npm run typecheck"
+steps:
+  pre_commit: [lint]
+  pre_push: [typecheck, test, lint]
+parallel: true
