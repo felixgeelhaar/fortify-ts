@@ -51,8 +51,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       tsup:
         specifier: ^8.5.1
@@ -70,8 +70,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       tsup:
         specifier: ^8.5.1
@@ -89,8 +89,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       tsup:
         specifier: ^8.5.1
@@ -105,8 +105,8 @@ importers:
   packages/core:
     dependencies:
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       tsup:
         specifier: ^8.5.1
@@ -124,8 +124,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       fast-check:
         specifier: ^4.8.0
@@ -165,8 +165,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       tsup:
         specifier: ^8.5.1
@@ -330,8 +330,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       tsup:
         specifier: ^8.5.1
@@ -349,8 +349,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       fast-check:
         specifier: ^4.8.0
@@ -408,8 +408,8 @@ importers:
         specifier: workspace:*
         version: link:../core
       zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       fast-check:
         specifier: ^4.8.0
@@ -2195,6 +2195,9 @@ packages:
   zod@4.3.6:
     resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
 
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+
 snapshots:
 
   '@babel/helper-string-parser@7.29.7': {}
@@ -3830,3 +3833,5 @@ snapshots:
   yocto-queue@0.1.0: {}
 
   zod@4.3.6: {}
+
+  zod@4.4.3: {}
