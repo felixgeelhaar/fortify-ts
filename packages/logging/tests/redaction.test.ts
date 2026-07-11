@@ -1042,7 +1042,7 @@ describe('redaction', () => {
             };
 
             const original = JSON.stringify(obj);
-            redactContext(obj as LogContext, config);
+            redactContext(obj, config);
 
             return JSON.stringify(obj) === original;
           }
