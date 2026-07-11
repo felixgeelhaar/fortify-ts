@@ -52,8 +52,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-turbo-
 
+      # Run the root vitest coverage directly (root vitest.config.ts emits the
+      # json-summary reporter to coverage/coverage-summary.json). `pnpm
+      # test:coverage` (turbo) only runs per-package coverage and never produces
+      # the root summary the threshold gate below reads, so it must not be used
+      # here.
       - name: Test with Coverage
-        run: pnpm test:coverage
+        run: pnpm exec vitest run --coverage
 
       - name: Check Coverage Thresholds
         if: matrix.node-version == '20'
