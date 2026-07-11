@@ -52,6 +52,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-turbo-
 
+      # Build all packages first: the root coverage run includes cross-package
+      # tests (e.g. middleware imports @klarlabs-studio/fortify-hedge), which
+      # resolve to each package's tsup `dist`. Without a build those imports fail
+      # to resolve (surfaced as import errors on Node 22).
+      - name: Build packages
+        run: pnpm build
+
       # Run the root vitest coverage directly (root vitest.config.ts emits the
       # json-summary reporter to coverage/coverage-summary.json). `pnpm
       # test:coverage` (turbo) only runs per-package coverage and never produces
