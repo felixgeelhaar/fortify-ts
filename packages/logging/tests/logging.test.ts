@@ -299,7 +299,7 @@ describe('createResilienceLogger', () => {
       child: vi.fn(),
     };
     mock.child.mockReturnValue(mock);
-    return mock as unknown as FortifyLogger;
+    return mock;
   }
 
   it('should pass through base logger methods', () => {

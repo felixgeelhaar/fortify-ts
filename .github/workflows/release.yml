@@ -43,11 +43,19 @@ jobs:
         uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
           version: pnpm changeset version
-          publish: pnpm changeset publish --access public --provenance
+          # `changeset publish` does NOT accept --access/--provenance (they are
+          # npm-publish flags and make changesets exit with "Unknown flags").
+          # Access is set via `.changeset/config.json` ("access": "public") and
+          # each package's publishConfig; provenance is enabled through the
+          # NPM_CONFIG_PROVENANCE env below, which changeset publish forwards to
+          # `npm publish`. Trusted publishing (OIDC) is engaged via setup-node's
+          # registry-url above.
+          publish: pnpm changeset publish
           commit: 'chore: release packages'
           title: 'chore: release packages'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
 
       - name: Create GitHub Release
         if: steps.changesets.outputs.published == 'true'
