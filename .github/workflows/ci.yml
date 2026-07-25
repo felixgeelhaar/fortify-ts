@@ -5,9 +5,17 @@ on:
   push:
     branches: [main]
     paths-ignore: ["**.md", "docs/**", "LICENSE"]
+  # No paths-ignore on pull_request. These contexts are required by branch
+  # protection, and a skipped workflow does not report a skipped check — it
+  # reports nothing, so the PR waits forever on a check that will never arrive
+  # and can only be admin-merged. mnemos hit exactly this: changelog PRs stayed
+  # BLOCKED because a paths-ignore meant the required contexts never ran.
+  #
+  # Running the bar on a docs-only PR is cheap — nothing it compiles changed, so
+  # it is a cache hit. push-to-main above still skips docs, where nothing is
+  # gating.
   pull_request:
     branches: [main]
-    paths-ignore: ["**.md", "docs/**", "LICENSE"]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
