@@ -3,6 +3,12 @@
   "remoteCache": {
     "signature": true
   },
+  "//": "globalDependencies is REQUIRED, not hygiene. Turbo hashes each task from its own package's files plus its declared workspace deps; a root config file that every package inherits is invisible to that hash unless listed here. tsconfig.base.json is extended by all 17 packages/*/tsconfig.json and is read by tsup's dts emit, so without this entry editing it leaves every build/test hash byte-identical and turbo serves a cache hit — restoring a stale dist/** that the tests then exercise, or replaying a stale test result outright. integration.yml restores .turbo across commits (restore-keys: ${{ runner.os }}-turbo-), so the stale artifact survives between runs. Same class of bug as klarlabs-studio/warden#100, where a cached PASS let a real regression reach main behind a green required check.",
+  "globalDependencies": [
+    "tsconfig.base.json",
+    "vitest.config.ts",
+    "eslint.config.js"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
