@@ -1,0 +1,208 @@
+{
+  "schema_version": "1.0.0",
+  "entries": [
+    {
+      "fingerprint": "c338c353cb3a6c7c6da5225347cf574021e95705ac2ce5c0bf1337c14f7beb68",
+      "rule_id": "DATA-001",
+      "file_path": "packages/core/tests/storage.test.ts",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "08ce86b3ab5f6c38908181df5a85af67f02780dbf06da7fdffaaade644c74701",
+      "rule_id": "DATA-001",
+      "file_path": "packages/rate-limit/tests/rate-limiter.test.ts",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "117f517b6cc5e319028452623e07eb9b038cca57b25820ae15bd9022bd83a2ed",
+      "rule_id": "DATA-001",
+      "file_path": "packages/rate-limit/tests/rate-limiter.test.ts",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "af7f99334fa6859a3d591fcf287ed6dabea63f49fb5bc92a74c14aa816b993e7",
+      "rule_id": "DATA-005",
+      "file_path": "packages/http/tests/http.test.ts",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "6b709bf8bf800f7366fcbcfff3d2d866b9b7041086f42a223ff974656fa3e7ce",
+      "rule_id": "DATA-005",
+      "file_path": "packages/http/tests/http.test.ts",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "6af577d33d72dfa77c0cdd6c9e3f71b213c2805f61dd9dfa518d74bf4c1a7c9f",
+      "rule_id": "IAC-018",
+      "file_path": ".github/workflows/security.yml",
+      "severity": "low",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "bea69f220ecafaf41fe10f34e07a7ed6a62326a1bdda8df8ed88bd7e75833b8f",
+      "rule_id": "IAC-158",
+      "file_path": ".github/workflows/security.yml",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "0c9a6b56f2995b887aa65e96c3c6b0e5eac9f8597d14e82fe6acf03090daf3e7",
+      "rule_id": "IAC-158",
+      "file_path": ".github/workflows/security.yml",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "be245a4499fe01a73e9664baf0ed8c855e243ef4da2b278bd541e113a9dfae2e",
+      "rule_id": "IAC-306",
+      "file_path": ".github/workflows/release.yml",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "52922952e40b8c5ebd4fef0969dd782d57266e9ecccc4e9bddc9be74f0f6daa2",
+      "rule_id": "IAC-308",
+      "file_path": ".github/workflows/nox-remediate.yml",
+      "severity": "low",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "8c9a05e7d0c8a05b61d4c18aefce8e2dc91a85c3456246a1c92bea30dbb416d8",
+      "rule_id": "IAC-309",
+      "file_path": ".github/workflows/ci.yml",
+      "severity": "low",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "5fdd90f6f5241ddcf6b787ba876a46fe47464b66c92deb2f02a8faa206c70afd",
+      "rule_id": "IAC-309",
+      "file_path": ".github/workflows/integration.yml",
+      "severity": "low",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "162a095592cae53b8ee25cadb877e2dd26172f5682b66569c434a5afe19aed4b",
+      "rule_id": "IAC-309",
+      "file_path": ".github/workflows/security.yml",
+      "severity": "low",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "1b0b29a27887f2614f0c643a14e6597743fb7866064bbe6700ed690b7072a65d",
+      "rule_id": "IAC-310",
+      "file_path": ".github/workflows/security.yml",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "8378df7a1d4adb5806616a668bc89e456b48fe9b7212ca5799b5b8eddbe0ae9c",
+      "rule_id": "IAC-314",
+      "file_path": ".github/workflows/nox-remediate.yml",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "e37e2faa5f7d812400d1323a31d22e93b710b881ea06f3b656d724454d47a8f4",
+      "rule_id": "IAC-314",
+      "file_path": ".github/workflows/release.yml",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "55c1e5b92c6190b70f2ecf8629306d5877a90da15bdcb9c92b169fee5f3141e8",
+      "rule_id": "SEC-080",
+      "file_path": "packages/logging/README.md",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "f2351a6155a1ac519e1571d160b92410fcd5020d64631c4c52f7cead9764e68f",
+      "rule_id": "SEC-080",
+      "file_path": "packages/logging/tests/redaction.test.ts",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "389aeec65477e9cf4deaa74b662cb15a63faca0903e0a0a24755611a6a5d8222",
+      "rule_id": "SEC-080",
+      "file_path": "packages/logging/tests/redaction.test.ts",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "af9a43ec246ddf85f6a732a0548b546f06ff8aade1bccfb8252bca74c1c58e4a",
+      "rule_id": "SEC-080",
+      "file_path": "packages/logging/tests/redaction.test.ts",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "41e5906ee86125eb9877b6ac17377166ce080643c975a6ee762b0fe4a2f95730",
+      "rule_id": "SEC-080",
+      "file_path": "packages/logging/tests/redaction.test.ts",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "6cd542fddee00911cbe65bb5f53f5d525d828fa27efb5fc9b6c32d60d8b7df32",
+      "rule_id": "SEC-082",
+      "file_path": "packages/logging/tests/redaction.test.ts",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "8abe5630cdca66ed0f412e7f26b6482e93be371778e5f61feec796fdf751db75",
+      "rule_id": "SEC-163",
+      "file_path": "packages/rate-limit/tests/rate-limiter.test.ts",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "f8df42d78ad9344b1cca931d8dac93a4ec49bcb4300e79743e26f17fea31bc0e",
+      "rule_id": "SLOP-001",
+      "file_path": "packages/core/src/storage.ts",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "88f43aa4febb1dbb3d0a9c574cbc5639364c3160e5885fa6e08e5f455c440511",
+      "rule_id": "SLOP-001",
+      "file_path": "packages/rate-limit/src/rate-limiter.ts",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "b5656a495953c22570a562950f3ca4358427c3477be4f4e106a0c3cd63061222",
+      "rule_id": "VULN-001",
+      "file_path": "pnpm-lock.yaml",
+      "severity": "low",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "d71bf82ad3aa3fc256bf653fc71061586c9d27c734c8b8996bd200040f3b19ae",
+      "rule_id": "VULN-002",
+      "file_path": "pnpm-lock.yaml",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "fe2a1355bb7dd7a8c30da7235411a2f208f1e2724ee32869552223f14b49b843",
+      "rule_id": "VULN-002",
+      "file_path": "pnpm-lock.yaml",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    },
+    {
+      "fingerprint": "52d1521cd7d03f21e7f93b4f5768174bcd0ed5058db10897c7345954dc3c3cd4",
+      "rule_id": "VULN-002",
+      "file_path": "pnpm-lock.yaml",
+      "severity": "medium",
+      "created_at": "2026-07-25T19:33:10.819018Z"
+    }
+  ]
+}
