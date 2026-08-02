@@ -17,6 +17,10 @@ on:
   pull_request:
     branches: [main]
 
+  # Re-run the bar on demand. Without this the only way to retest main is to
+  # push a commit — which is how a shared-workflow startup_failure went
+  # unnoticed here, with no way to confirm a fix in place.
+  workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
